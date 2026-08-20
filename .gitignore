@@ -1,0 +1,40 @@
+# ============================
+# Elector Lookup Portal
+# Root .gitignore
+# ============================
+
+# --- Environment files (NEVER commit secrets) ---
+.env
+.env.local
+etl/.env
+web/.env.local
+
+# --- Raw data (NEVER commit PII) ---
+data/
+
+# --- ETL output ---
+etl/output/
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# --- Node ---
+node_modules/
+.next/
+out/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

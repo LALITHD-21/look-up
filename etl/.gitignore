@@ -1,0 +1,14 @@
+# Environment files
+.env
+
+# ETL output
+output/
+
+# Raw data
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

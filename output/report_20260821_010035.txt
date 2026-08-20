@@ -1,0 +1,31 @@
+============================================================
+  ETL Run Report
+  Timestamp: 2026-08-21 01:00:35
+============================================================
+
+Source files processed:
+  - Davanagere- Sheet2.xlsx
+  - KOLAR.xlsx
+  - TUMKUR.xlsx
+  - Untitled spreadsheet - Sheet1 (10).xlsx
+
+Total raw rows read:                 165
+Rows after cleaning:                 114
+
+--- Cleaning Summary ---
+Invalid EPIC numbers:                  0 (dropped)
+Null names:                            0 (dropped)
+Exact duplicate rows:                  0 (dropped)
+Duplicate EPIC numbers:                0 (kept first, rest flagged)
+Age out of range (18-120):             0 (flagged, kept)
+Invalid sex values:                    0 (set to None)
+
+--- Photo Status ---
+photo_url set:                         0 (PENDING — photo feature not confirmed)
+photo_url NULL:                      114 (all records)
+
+
+============================================================
+============================================================
+  ETL DRY RUN COMPLETE
+============================================================

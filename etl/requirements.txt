@@ -1,0 +1,8 @@
+# ETL Pipeline Dependencies
+pandas>=2.0
+openpyxl>=3.1
+pdfplumber>=0.11
+supabase>=2.0
+python-dotenv>=1.0
+tqdm>=4.65
+psycopg2-binary>=2.9

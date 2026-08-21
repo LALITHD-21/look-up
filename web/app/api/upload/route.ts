@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import * as XLSX from 'xlsx';
+import { cookies } from 'next/headers';
 
 interface ElectorInputRecord {
     serial_number?: number | null;
@@ -12,8 +13,28 @@ interface ElectorInputRecord {
     occupation?: string | null;
     age?: number | null;
     sex?: 'M' | 'F' | null;
+    part_number?: string | null;
+    polling_station_name?: string | null;
+    polling_address?: string | null;
     photo_url?: string | null;
 }
+
+// Official Polling station map fallback by Part Number
+const POLLING_STATION_MAP: Record<string, { station: string; address: string }> = {
+    '92': { station: 'Kalidasa Composite Pre- University College, Tumkur', address: 'Entire Ward No.01 to 05, Tumkur Taluk, Tumkur District, Karnataka' },
+    '93': { station: 'Government Model Higher Primary School, Shishuvihara Compound, Tumkur', address: 'Entire Ward No.06 to 10, Tumkur Taluk, Tumkur District, Karnataka' },
+    '94': { station: 'Siddaganga Pre University College,B H Road Gandhinagara, Tumkur', address: 'Entire Ward No.11 to 15, Tumkur Taluk, Tumkur District, Karnataka' },
+    '95': { station: 'Government Higher Primary School, Shanthi nagara ASK Palya', address: 'Entire Ward No.16 to 20, Tumkur Taluk, Tumkur District, Karnataka' },
+    '96': { station: 'Sri Siddaganga Kannada Elementory Higher Primary School, Room No-2, Tumkur', address: 'Entire Ward No.21 to 25, Tumkur Taluk, Tumkur District, Karnataka' },
+    '97': { station: 'Nalanda convent and high school, sapthagiri extension, Room No-1, Tumkur', address: 'Entire Ward No.26 to 30, Tumkur Taluk, Tumkur District, Karnataka' },
+    '98': { station: 'Government Model Higher Primary School, Kyathsandra, Room No-1, Tumkur.', address: 'Entire Ward No.31 to 35, Tumkur Taluk, Tumkur District, Karnataka' },
+    '99': { station: 'Court Hall, Taluk Office Tumkur', address: 'Entire Kasaba Hobli - Rural, Tumkur Taluk, Tumkur District, Karnataka' },
+    '100': { station: 'Govt. Higher Primary School, Gulur', address: 'Entire Gulur Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+    '101': { station: 'Ganapathi High School, Hebbur', address: 'Entire Hebbur Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+    '102': { station: 'Govt. Higher Primary School, Urdigere', address: 'Entire Urdigere Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+    '103': { station: 'Kuvempu Govt. Primary School, Bellavi', address: 'Entire Bellavi Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+    '104': { station: 'Govt. Model Higher Primary School, Kora', address: 'Entire Kora Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+};
 
 // Canonical column mapping helper
 function canonicalizeKey(key: string): string {
@@ -26,6 +47,9 @@ function canonicalizeKey(key: string): string {
     if (k.includes('occupation') || k.includes('occupcation') || k.includes('job') || k.includes('work')) return 'occupation';
     if (k.includes('age')) return 'age';
     if (k.includes('sex') || k.includes('gender')) return 'sex';
+    if (k.includes('part') || k.includes('partno') || k.includes('partnumber')) return 'part_number';
+    if (k.includes('station') || k.includes('pollingname')) return 'polling_station_name';
+    if (k.includes('pollingaddress') || k.includes('psaddress')) return 'polling_address';
     if (k.includes('serial') || k.includes('slno') || k.includes('srno') || k.includes('sno')) return 'serial_number';
     return key;
 }
@@ -34,12 +58,27 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now();
 
     try {
-        const supabase = createClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        // Auth check: validate custom cookie-based session
+        const cookieStore = cookies();
+        const sessionCookie = cookieStore.get('elector_auth_session')?.value;
+        let isAuthenticated = false;
 
-        if (authError || !user) {
+        if (sessionCookie) {
+            try {
+                const decoded = JSON.parse(atob(sessionCookie));
+                if (decoded && decoded.expiresAt && decoded.expiresAt > Date.now()) {
+                    isAuthenticated = true;
+                }
+            } catch {
+                isAuthenticated = false;
+            }
+        }
+
+        if (!isAuthenticated) {
             return NextResponse.json({ error: 'Unauthorized: Log in required' }, { status: 401 });
         }
+
+        const supabase = createAdminClient();
 
         const formData = await req.formData();
         const file = formData.get('file') as File | null;
@@ -48,64 +87,144 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
         }
 
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
         const fileName = file.name;
         const ext = fileName.slice(((fileName.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase();
 
+        // 1. Strict File Format Validation
+        if (!['xlsx', 'xls', 'csv', 'pdf'].includes(ext)) {
+            return NextResponse.json(
+                { error: 'Invalid file format. Please upload an Excel (.xlsx, .xls, .csv) or PDF (.pdf) file.' },
+                { status: 400 }
+            );
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
         let rawRows: Record<string, any>[] = [];
+        let sheetsParsedCount = 1;
+        const fileFormat = ext === 'pdf' ? 'PDF' : 'EXCEL';
 
         if (['xlsx', 'xls', 'csv'].includes(ext)) {
-            // Parse spreadsheet
+            // Parse spreadsheet workbook across ALL separate sheets
             const workbook = XLSX.read(buffer, { type: 'buffer' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+            sheetsParsedCount = workbook.SheetNames.length;
+
+            for (const sheetName of workbook.SheetNames) {
+                const worksheet = workbook.Sheets[sheetName];
+
+                // Mode A: Positional Array Parsing ({ header: 1 }) for Electoral Rolls
+                const arrayRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+                let currentPartNo: string | null = null;
+                let positionalFound = 0;
+
+                for (const row of arrayRows) {
+                    if (!row || !Array.isArray(row) || row.length === 0) continue;
+
+                    const rowString = row.map(c => String(c || '').trim()).join(' ');
+
+                    const partMatch = rowString.match(/Part\s*N?\s*o?\s*[\:\.\·\-\s]\s*(\d+[A-Za-z0-9\/\-]*)/i);
+                    if (partMatch) {
+                        currentPartNo = partMatch[1].trim();
+                    }
+
+                    let epicVal: string | null = null;
+                    for (let idx = 0; idx < row.length; idx++) {
+                        const cellText = String(row[idx] || '').trim();
+                        if (!cellText) continue;
+                        const epicMatch = cellText.match(/\b([A-Z]{3}\d{7})\b/i);
+                        if (epicMatch) {
+                            epicVal = epicMatch[1].toUpperCase();
+                        }
+                    }
+
+                    if (epicVal) {
+                        let snoVal: number | null = null;
+                        let ageVal: number | null = null;
+                        let sexVal: 'M' | 'F' | null = null;
+
+                        for (let idx = 0; idx < row.length; idx++) {
+                            const val = String(row[idx] || '').trim();
+                            if (!val) continue;
+
+                            if (/^\d{1,5}$/.test(val) && !snoVal) {
+                                const num = parseInt(val, 10);
+                                if (num > 0 && num < 10000) snoVal = num;
+                            }
+
+                            if (/\b(1[89]|[2-9]\d|1[01]\d)\b/.test(val) && !ageVal && val !== String(snoVal)) {
+                                const num = parseInt(val, 10);
+                                if (num >= 18 && num <= 120) ageVal = num;
+                            }
+
+                            if (/^(M|F|Male|Female)$/i.test(val) && !sexVal) {
+                                sexVal = val.toUpperCase().startsWith('M') ? 'M' : 'F';
+                            }
+                        }
+
+                        let nameVal = row[1] ? String(row[1]).trim().replace(/\s+/g, ' ') : '';
+                        let relVal = row[5] ? String(row[5]).trim().replace(/\s+/g, ' ') : '';
+                        let addrVal = row[8] ? String(row[8]).trim().replace(/\s+/g, ' ') : '';
+                        let qualVal = row[12] ? String(row[12]).trim() : '';
+                        let occVal = row[13] ? String(row[13]).trim() : '';
+
+                        if (nameVal && !nameVal.toLowerCase().includes('name of the elector') && !nameVal.toLowerCase().includes('sino')) {
+                            rawRows.push({
+                                epic_number: epicVal,
+                                name: nameVal,
+                                relative_name: relVal || null,
+                                address: addrVal || null,
+                                qualification: qualVal || null,
+                                occupation: occVal || null,
+                                age: ageVal,
+                                sex: sexVal,
+                                serial_number: snoVal,
+                                part_number: currentPartNo
+                            });
+                            positionalFound++;
+                        }
+                    }
+                }
+
+                // Mode B: Standard Key-Based Object Parsing for standard table spreadsheets
+                if (positionalFound === 0) {
+                    const objectRows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+                    rawRows.push(...objectRows);
+                }
+            }
         } else if (ext === 'pdf') {
-            // Import pdf-parse PDFParse class constructor
+            // PDF parsing using pdf-parse
             const pdfParseModule = require('pdf-parse');
             const PDFParseClass = pdfParseModule.PDFParse || pdfParseModule;
             const parser = new PDFParseClass({ data: buffer });
             const pdfResult = await parser.getText();
             const fullText = typeof pdfResult === 'string' ? pdfResult : (pdfResult?.text || '');
 
-            // Split into lines or double-newline blocks
             const lines = fullText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-
-            // Group lines by EPIC numbers found
             const epicRegex = /([A-Z]{3}\d{7})/gi;
-
-            let currentEntry: Record<string, any> | null = null;
 
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
                 const match = epicRegex.exec(line);
-                epicRegex.lastIndex = 0; // reset regex index
+                epicRegex.lastIndex = 0;
 
                 if (match) {
                     const epic = match[1].toUpperCase();
-
-                    // Parse line for fields: e.g. "1  A N Naveen Kumar  K Narasimha Murthy ... M  32  YNT3665783"
                     const parts = line.split(/\s{2,}|\t/).map(p => p.trim()).filter(Boolean);
 
                     let slNo: number | null = null;
                     let ageVal: number | null = null;
                     let sexVal: 'M' | 'F' | null = null;
 
-                    // Extract Sex (M/F)
                     if (/\bM\b/i.test(line)) sexVal = 'M';
                     else if (/\bF\b/i.test(line)) sexVal = 'F';
 
-                    // Extract Age
                     const ageMatch = line.match(/\b(1[89]|[2-9]\d|1[01]\d)\b/);
                     if (ageMatch) ageVal = parseInt(ageMatch[1], 10);
 
-                    // Extract Serial number if line starts with a number
                     const slMatch = line.match(/^\d+/);
                     if (slMatch) slNo = parseInt(slMatch[0], 10);
 
-                    // Extract Name and Relative Name from parts if available
                     let nameVal = '';
                     let relativeVal = '';
                     let addressVal = '';
@@ -115,7 +234,6 @@ export async function POST(req: NextRequest) {
                         relativeVal = parts[2] || '';
                         if (parts.length >= 4) addressVal = parts[3];
                     } else {
-                        // Fallback: cleanup line text
                         const cleanedLine = line.replace(/([A-Z]{3}\d{7})/gi, '').replace(/\bPhoto Available\b/gi, '').trim();
                         nameVal = cleanedLine || `Elector (${epic})`;
                     }
@@ -132,7 +250,6 @@ export async function POST(req: NextRequest) {
                 }
             }
 
-            // Fallback if no line-structured rows matched: extract all unique EPICs directly
             if (rawRows.length === 0) {
                 const matches = Array.from(fullText.matchAll(/([A-Z]{3}\d{7})/gi));
                 const uniqueEpics = Array.from(new Set(matches.map(m => m[1].toUpperCase())));
@@ -142,24 +259,19 @@ export async function POST(req: NextRequest) {
                     serial_number: idx + 1
                 }));
             }
-        } else {
-            return NextResponse.json(
-                { error: 'Unsupported file format. Please upload .xlsx, .xls, .csv, or .pdf files.' },
-                { status: 400 }
-            );
         }
 
         if (!rawRows || rawRows.length === 0) {
             return NextResponse.json({ error: 'Uploaded file contains no readable data rows or valid EPIC numbers.' }, { status: 400 });
         }
 
-        // Clean & Validate Records
+        // 2. Strict Deduplication & Validation across all rows and separate sheets
         const validRecords: ElectorInputRecord[] = [];
-        let droppedCount = 0;
+        let duplicateCount = 0;
+        let invalidCount = 0;
         const seenEpics = new Set<string>();
 
         for (const row of rawRows) {
-            // Re-key object keys
             const cleanedObj: Record<string, any> = {};
             for (const [k, v] of Object.entries(row)) {
                 cleanedObj[canonicalizeKey(k)] = v;
@@ -168,20 +280,25 @@ export async function POST(req: NextRequest) {
             const rawEpic = String(cleanedObj.epic_number || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
             const epicValid = /^[A-Z]{3}\d{7}$/.test(rawEpic);
 
-            if (!epicValid || seenEpics.has(rawEpic)) {
-                droppedCount++;
+            if (!epicValid) {
+                invalidCount++;
+                continue;
+            }
+
+            // Deduplication check
+            if (seenEpics.has(rawEpic)) {
+                duplicateCount++;
                 continue;
             }
 
             const rawName = String(cleanedObj.name || '').trim().replace(/\s+/g, ' ');
             if (!rawName) {
-                droppedCount++;
+                invalidCount++;
                 continue;
             }
 
             seenEpics.add(rawEpic);
 
-            // Parse optional fields
             let ageNum: number | null = null;
             if (cleanedObj.age) {
                 const parsedAge = parseInt(String(cleanedObj.age), 10);
@@ -203,6 +320,9 @@ export async function POST(req: NextRequest) {
                 if (!isNaN(parsedSl)) slNo = parsedSl;
             }
 
+            const partNo = cleanedObj.part_number ? String(cleanedObj.part_number).trim() : null;
+            const pollingInfo = partNo ? POLLING_STATION_MAP[partNo] : null;
+
             validRecords.push({
                 epic_number: rawEpic,
                 name: rawName,
@@ -213,6 +333,9 @@ export async function POST(req: NextRequest) {
                 age: ageNum,
                 sex: sexVal,
                 serial_number: slNo,
+                part_number: partNo,
+                polling_station_name: cleanedObj.polling_station_name ? String(cleanedObj.polling_station_name).trim() : (pollingInfo?.station || null),
+                polling_address: cleanedObj.polling_address ? String(cleanedObj.polling_address).trim() : (pollingInfo?.address || null),
                 photo_url: null
             });
         }
@@ -224,7 +347,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Upsert to Supabase in batches of 100
+        // 3. Batch Upsert into Supabase (Idempotent ON CONFLICT DO UPDATE)
         const batchSize = 100;
         let upsertedCount = 0;
 
@@ -248,10 +371,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             fileName: fileName,
+            fileFormat: fileFormat,
+            sheetsParsed: sheetsParsedCount,
             totalRawRows: rawRows.length,
             validRecords: validRecords.length,
             upsertedRecords: upsertedCount,
-            droppedRecords: droppedCount,
+            duplicateRecords: duplicateCount,
+            droppedRecords: invalidCount,
             durationMs: durationMs
         });
     } catch (err: any) {

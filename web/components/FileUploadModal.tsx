@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Upload, X, FileSpreadsheet, FileText, CheckCircle2, AlertCircle, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { Upload, X, FileSpreadsheet, FileText, CheckCircle2, AlertCircle, Loader2, Sparkles, RefreshCw, Layers, ShieldCheck } from 'lucide-react';
 
 interface FileUploadModalProps {
     isOpen: boolean;
@@ -11,9 +11,12 @@ interface FileUploadModalProps {
 
 interface UploadReport {
     fileName: string;
+    fileFormat?: string;
+    sheetsParsed?: number;
     totalRawRows: number;
     validRecords: number;
     upsertedRecords: number;
+    duplicateRecords?: number;
     droppedRecords: number;
     durationMs: number;
 }
@@ -28,11 +31,21 @@ export default function FileUploadModal({ isOpen, onClose, onUploadSuccess }: Fi
 
     if (!isOpen) return null;
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setSelectedFile(e.target.files[0]);
+    const validateAndSetFile = (file: File) => {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (['xlsx', 'xls', 'csv', 'pdf'].includes(ext || '')) {
+            setSelectedFile(file);
             setUploadError(null);
             setReport(null);
+        } else {
+            setSelectedFile(null);
+            setUploadError('Invalid file format. Please select an Excel spreadsheet (.xlsx, .xls, .csv) or PDF document (.pdf).');
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            validateAndSetFile(e.target.files[0]);
         }
     };
 
@@ -49,15 +62,7 @@ export default function FileUploadModal({ isOpen, onClose, onUploadSuccess }: Fi
         e.preventDefault();
         setIsDragging(false);
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            const file = e.dataTransfer.files[0];
-            const ext = file.name.split('.').pop()?.toLowerCase();
-            if (['xlsx', 'xls', 'csv', 'pdf'].includes(ext || '')) {
-                setSelectedFile(file);
-                setUploadError(null);
-                setReport(null);
-            } else {
-                setUploadError('Please select a valid .xlsx, .xls, .csv, or .pdf file.');
-            }
+            validateAndSetFile(e.dataTransfer.files[0]);
         }
     };
 
@@ -81,7 +86,7 @@ export default function FileUploadModal({ isOpen, onClose, onUploadSuccess }: Fi
             setIsUploading(false);
 
             if (!res.ok) {
-                setUploadError(data.error || 'Failed to upload and process file.');
+                setUploadError(data.error || 'Failed to upload and process dataset.');
             } else {
                 setReport(data);
                 if (onUploadSuccess) onUploadSuccess();
@@ -110,7 +115,7 @@ export default function FileUploadModal({ isOpen, onClose, onUploadSuccess }: Fi
                         </div>
                         <div>
                             <h3 className="text-sm sm:text-base font-bold text-gray-900">Upload Voter Dataset</h3>
-                            <p className="text-[10px] sm:text-xs text-gray-500">Supported formats: .xlsx, .xls, .csv, .pdf</p>
+                            <p className="text-[10px] sm:text-xs text-gray-500">Formats: Excel (.xlsx, .xls, .csv) & PDF (.pdf)</p>
                         </div>
                     </div>
                     <button
@@ -123,6 +128,24 @@ export default function FileUploadModal({ isOpen, onClose, onUploadSuccess }: Fi
 
                 {/* Modal Body */}
                 <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
+                    {/* Format Badges & Instructions */}
+                    {!report && (
+                        <div className="flex items-center justify-between text-xs px-1">
+                            <span className="text-gray-500 font-medium">Supported File Formats:</span>
+                            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
+                                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    .XLSX / .XLS
+                                </span>
+                                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                    .CSV
+                                </span>
+                                <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                                    .PDF
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Drag and Drop Zone */}
                     {!report && (
                         <div
@@ -150,17 +173,17 @@ export default function FileUploadModal({ isOpen, onClose, onUploadSuccess }: Fi
                                 <div className="space-y-3">
                                     <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto">
                                         {selectedFile.name.endsWith('.pdf') ? (
-                                            <FileText className="w-6 h-6" />
+                                            <FileText className="w-6 h-6 text-rose-600" />
                                         ) : (
-                                            <FileSpreadsheet className="w-6 h-6" />
+                                            <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
                                         )}
                                     </div>
                                     <div>
-                                        <p className="text-sm font-semibold text-gray-900 truncate max-w-xs mx-auto">
+                                        <p className="text-sm font-bold text-gray-900 truncate max-w-xs mx-auto">
                                             {selectedFile.name}
                                         </p>
                                         <p className="text-xs text-gray-500 mt-0.5">
-                                            {(selectedFile.size / 1024).toFixed(1)} KB
+                                            {(selectedFile.size / 1024).toFixed(1)} KB • {selectedFile.name.split('.').pop()?.toUpperCase()} Document
                                         </p>
                                     </div>
                                     <button
@@ -176,12 +199,12 @@ export default function FileUploadModal({ isOpen, onClose, onUploadSuccess }: Fi
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    <Upload className="w-10 h-10 text-gray-400 mx-auto" />
+                                    <Upload className="w-10 h-10 text-indigo-400 mx-auto" />
                                     <div>
-                                        <p className="text-sm font-medium text-gray-700">
+                                        <p className="text-sm font-semibold text-gray-800">
                                             Click to browse or drag & drop file
                                         </p>
-                                        <p className="text-xs text-gray-400">Excel spreadsheets (.xlsx, .xls, .csv) or PDF documents</p>
+                                        <p className="text-xs text-gray-500 mt-1">Excel spreadsheets (.xlsx, .xls, .csv) or PDF documents (.pdf)</p>
                                     </div>
                                 </div>
                             )}
@@ -190,45 +213,61 @@ export default function FileUploadModal({ isOpen, onClose, onUploadSuccess }: Fi
 
                     {/* Error Banner */}
                     {uploadError && (
-                        <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 text-xs leading-relaxed">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-500 mt-0.5" />
+                        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-700 text-xs leading-relaxed">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-500 mt-0.5" />
                             <span>{uploadError}</span>
                         </div>
                     )}
 
                     {/* Ingestion Report Summary */}
                     {report && (
-                        <div className="p-5 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-4 animate-fadeIn">
-                            <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                                <span>Dataset Ingested Successfully!</span>
+                        <div className="p-5 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-4 animate-fadeIn">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                    <span>Dataset Processed & Ingested!</span>
+                                </div>
+                                {report.fileFormat && (
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        {report.fileFormat} FORMAT
+                                    </span>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 text-xs">
-                                <div className="p-3 bg-white rounded-lg border border-emerald-100">
-                                    <p className="text-gray-500">File Name</p>
-                                    <p className="font-semibold text-gray-900 truncate mt-0.5">{report.fileName}</p>
+                                <div className="p-3 bg-white rounded-lg border border-emerald-100 shadow-xs">
+                                    <p className="text-gray-500 text-[11px]">Unique Voters Ingested</p>
+                                    <p className="font-extrabold text-emerald-600 text-lg mt-0.5">{report.upsertedRecords.toLocaleString()}</p>
                                 </div>
-                                <div className="p-3 bg-white rounded-lg border border-emerald-100">
-                                    <p className="text-gray-500">Database Upserts</p>
-                                    <p className="font-bold text-emerald-600 text-base mt-0.5">{report.upsertedRecords}</p>
+
+                                <div className="p-3 bg-white rounded-lg border border-emerald-100 shadow-xs">
+                                    <p className="text-gray-500 text-[11px]">Sheets Processed</p>
+                                    <p className="font-bold text-gray-900 text-base mt-0.5 flex items-center gap-1">
+                                        <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                                        <span>{report.sheetsParsed || 1} {report.sheetsParsed === 1 ? 'Sheet' : 'Sheets'}</span>
+                                    </p>
                                 </div>
-                                <div className="p-3 bg-white rounded-lg border border-emerald-100">
-                                    <p className="text-gray-500">Raw Rows Read</p>
-                                    <p className="font-semibold text-gray-900 mt-0.5">{report.totalRawRows}</p>
+
+                                <div className="p-3 bg-white rounded-lg border border-emerald-100 shadow-xs">
+                                    <p className="text-gray-500 text-[11px]">Duplicates Handled</p>
+                                    <p className="font-bold text-indigo-600 text-sm mt-0.5 flex items-center gap-1">
+                                        <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                                        <span>{report.duplicateRecords || 0} Merged</span>
+                                    </p>
                                 </div>
-                                <div className="p-3 bg-white rounded-lg border border-emerald-100">
-                                    <p className="text-gray-500">Dropped / Invalid</p>
-                                    <p className="font-semibold text-gray-600 mt-0.5">{report.droppedRecords}</p>
+
+                                <div className="p-3 bg-white rounded-lg border border-emerald-100 shadow-xs">
+                                    <p className="text-gray-500 text-[11px]">Raw Rows Scanned</p>
+                                    <p className="font-semibold text-gray-900 mt-0.5">{report.totalRawRows.toLocaleString()}</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between text-xs text-emerald-700 pt-1 font-mono">
+                            <div className="flex items-center justify-between text-xs text-emerald-700 pt-1 font-mono text-[11px]">
                                 <span className="flex items-center gap-1">
                                     <Sparkles className="w-3.5 h-3.5" />
                                     <span>Processed in {report.durationMs}ms</span>
                                 </span>
-                                <span>Idempotent Upsert</span>
+                                <span className="font-bold">Idempotent Deduplication</span>
                             </div>
                         </div>
                     )}

@@ -193,12 +193,16 @@ export async function POST(req: NextRequest) {
                 }
             }
         } else if (ext === 'pdf') {
-            // PDF parsing using pdf-parse
-            const pdfParseModule = require('pdf-parse');
-            const PDFParseClass = pdfParseModule.PDFParse || pdfParseModule;
-            const parser = new PDFParseClass({ data: buffer });
-            const pdfResult = await parser.getText();
-            const fullText = typeof pdfResult === 'string' ? pdfResult : (pdfResult?.text || '');
+            // PDF text parsing using pdf-parse 1.1.1
+            const pdfParse = require('pdf-parse');
+            let fullText = '';
+            try {
+                const pdfData = await pdfParse(buffer);
+                fullText = pdfData?.text || '';
+            } catch (pErr: any) {
+                console.error('PDF extraction fallback:', pErr);
+                fullText = buffer.toString('utf-8');
+            }
 
             const lines = fullText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
             const epicRegex = /([A-Z]{3}\d{7})/gi;

@@ -1,4 +1,5 @@
 import LogoutButton from '@/components/LogoutButton';
+import LiveRecordBadge from '@/components/LiveRecordBadge';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShieldCheck } from 'lucide-react';
@@ -31,11 +32,8 @@ export default function DashboardLayout({
 
           {/* Right Header Status & Logout */}
           <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
-            {/* Live Database Index Status Badge */}
-            <div className="hidden md:inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-slate-100/90 border border-slate-200/80 text-xs font-extrabold text-slate-700 shadow-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>13,600 Records Indexed</span>
-            </div>
+            {/* Real-time Live Database Index Status Badge */}
+            <LiveRecordBadge />
 
             <LogoutButton />
           </div>

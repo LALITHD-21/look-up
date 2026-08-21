@@ -195,7 +195,7 @@ export default function DashboardPage() {
                   </span>
                 </h1>
                 <p className="text-sm sm:text-base text-slate-500 max-w-lg mx-auto font-semibold leading-relaxed px-2">
-                  Search 13,600+ verified voter records instantly by 10-digit EPIC number
+                  Search verified voter records instantly by 10-digit EPIC number
                 </p>
               </div>
             </div>

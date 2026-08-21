@@ -52,7 +52,6 @@ if (fs.existsSync(pollingDir)) {
                 const worksheet = workbook.Sheets[sheetName];
                 const cellKeys = Object.keys(worksheet).filter(k => !k.startsWith('!'));
                 
-                // Group cells by row number
                 const rowMap = {};
                 for (const key of cellKeys) {
                     const rowNum = key.replace(/[A-Z]/g, '');
@@ -63,14 +62,12 @@ if (fs.existsSync(pollingDir)) {
 
                 for (const r of Object.keys(rowMap)) {
                     const row = rowMap[r];
-                    
                     let partNo = null;
                     let district = row['B'] || '';
                     let taluk = row['C'] || '';
                     let stationName = row['E'] || '';
                     let area = row['F'] || '';
 
-                    // Try to find numeric Part Number in D, C, or B
                     for (const colLetter of ['D', 'C', 'B', 'E', 'A']) {
                         const val = (row[colLetter] || '').trim();
                         if (/^\d{1,3}$/.test(val)) {
@@ -84,11 +81,8 @@ if (fs.existsSync(pollingDir)) {
 
                     if (!partNo) continue;
 
-                    // Clean stationName and area
                     stationName = stationName.replace(/\r\n/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
                     area = area.replace(/\r\n/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-                    
-                    // Strip trailing voter totals from area string while preserving ward numbers (e.g. "Entire Ward No.01 to 05738" -> "Entire Ward No.01 to 05")
                     area = area.replace(/(\d{1,2})\d{3,5}$/g, '$1').trim();
 
                     district = district.replace(/\r\n/g, ' ').replace(/\s+/g, ' ').trim();
@@ -96,7 +90,6 @@ if (fs.existsSync(pollingDir)) {
 
                     if (!stationName || stationName.toLowerCase().includes('part name') || stationName.toLowerCase().includes('taluk name')) continue;
 
-                    // Construct full polling address string
                     let fullAddress = area;
                     if (taluk) fullAddress += `, ${taluk} Taluk`;
                     if (district) fullAddress += `, ${district} District`;
@@ -116,6 +109,23 @@ if (fs.existsSync(pollingDir)) {
 }
 
 console.log(`✓ Successfully mapped ${Object.keys(masterPollingMap).length} Parts from 'poling addres/' folder!`);
+
+// Fallback polling station map for known Tumkur Hobli parts if missing
+const FALLBACK_POLLING_MAP = {
+    '92': { station: 'Kalidasa Composite Pre- University College, Tumkur', address: 'Entire Ward No.01 to 05, Tumkur Taluk, Tumkur District, Karnataka' },
+    '93': { station: 'Government Model Higher Primary School, Shishuvihara Compound, Tumkur', address: 'Entire Ward No.06 to 10, Tumkur Taluk, Tumkur District, Karnataka' },
+    '94': { station: 'Siddaganga Pre University College,B H Road Gandhinagara, Tumkur', address: 'Entire Ward No.11 to 15, Tumkur Taluk, Tumkur District, Karnataka' },
+    '95': { station: 'Government Higher Primary School, Shanthi nagara ASK Palya', address: 'Entire Ward No.16 to 20, Tumkur Taluk, Tumkur District, Karnataka' },
+    '96': { station: 'Sri Siddaganga Kannada Elementory Higher Primary School, Room No-2, Tumkur', address: 'Entire Ward No.21 to 25, Tumkur Taluk, Tumkur District, Karnataka' },
+    '97': { station: 'Nalanda convent and high school, sapthagiri extension, Room No-1, Tumkur', address: 'Entire Ward No.26 to 30, Tumkur Taluk, Tumkur District, Karnataka' },
+    '98': { station: 'Government Model Higher Primary School, Kyathsandra, Room No-1, Tumkur.', address: 'Entire Ward No.31 to 35, Tumkur Taluk, Tumkur District, Karnataka' },
+    '99': { station: 'Court Hall, Taluk Office Tumkur', address: 'Entire Kasaba Hobli - Rural, Tumkur Taluk, Tumkur District, Karnataka' },
+    '100': { station: 'Govt. Higher Primary School, Gulur', address: 'Entire Gulur Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+    '101': { station: 'Ganapathi High School, Hebbur', address: 'Entire Hebbur Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+    '102': { station: 'Govt. Higher Primary School, Urdigere', address: 'Entire Urdigere Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+    '103': { station: 'Kuvempu Govt. Primary School, Bellavi', address: 'Entire Bellavi Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+    '104': { station: 'Govt. Model Higher Primary School, Kora', address: 'Entire Kora Hobli, Tumkur Taluk, Tumkur District, Karnataka' },
+};
 
 // ============================================================
 // STAGE 2: Parse Elector Datasets from `pdf/` & Ingest
@@ -146,7 +156,7 @@ for (const file of files) {
 
                 const rowString = row.map(c => String(c || '').trim()).join(' ');
 
-                // Match Part No in header or row
+                // Match Part No in row
                 const partMatch = rowString.match(/Part\s*N?\s*o?\s*[\:\.\·\-\s]\s*(\d+[A-Za-z0-9\/\-]*)/i);
                 if (partMatch) {
                     currentPartNo = partMatch[1].trim();
@@ -154,15 +164,6 @@ for (const file of files) {
 
                 // Search row for EPIC number pattern: ^[A-Z]{3}\d{7}$
                 let epicVal = null;
-                let nameVal = null;
-                let relVal = null;
-                let addrVal = null;
-                let qualVal = null;
-                let occVal = null;
-                let ageVal = null;
-                let sexVal = null;
-                let snoVal = null;
-
                 for (let idx = 0; idx < row.length; idx++) {
                     const cellText = String(row[idx] || '').trim();
                     if (!cellText) continue;
@@ -175,42 +176,77 @@ for (const file of files) {
 
                 if (!epicVal || seenEpics.has(epicVal)) continue;
 
-                // Extract numeric & categorical fields
+                // Smart cell extraction across all columns
+                let nameVal = '';
+                let relVal = '';
+                let addrVal = '';
+                let qualVal = '';
+                let occVal = '';
+                let ageVal = null;
+                let sexVal = null;
+                let snoVal = null;
+
                 for (let idx = 0; idx < row.length; idx++) {
                     const val = String(row[idx] || '').trim();
                     if (!val) continue;
 
-                    if (/^\d{1,5}$/.test(val) && !snoVal) {
+                    // Serial Number
+                    if (/^\d{1,5}$/.test(val) && !snoVal && (idx === 0 || idx === 1)) {
                         const num = parseInt(val, 10);
                         if (num > 0 && num < 10000) snoVal = num;
                     }
 
+                    // Age
                     if (/\b(1[89]|[2-9]\d|1[01]\d)\b/.test(val) && !ageVal && val !== String(snoVal)) {
                         const num = parseInt(val, 10);
                         if (num >= 18 && num <= 120) ageVal = num;
                     }
 
+                    // Sex
                     if (/^(M|F|Male|Female)$/i.test(val) && !sexVal) {
                         sexVal = val.toUpperCase().startsWith('M') ? 'M' : 'F';
                     }
                 }
 
-                // Positional cell assignments for standard Graduate Roll format
+                // Name: Column 1
                 if (row[1]) nameVal = String(row[1]).trim().replace(/\s+/g, ' ');
-                if (row[5]) relVal = String(row[5]).trim().replace(/\s+/g, ' ');
-                if (row[8]) addrVal = String(row[8]).trim().replace(/\s+/g, ' ');
-                if (row[12]) qualVal = String(row[12]).trim();
-                if (row[13]) occVal = String(row[13]).trim();
 
-                // Skip header rows or invalid name rows
+                // Relative Name: Column 4 or 5
+                if (row[4] && !/\d/.test(String(row[4])) && String(row[4]).length > 2) {
+                    relVal = String(row[4]).trim().replace(/\s+/g, ' ');
+                } else if (row[5]) {
+                    relVal = String(row[5]).trim().replace(/\s+/g, ' ');
+                }
+
+                // Address: Column 7, 8, 9, or 6
+                for (const colIdx of [7, 8, 9, 6]) {
+                    const cellStr = String(row[colIdx] || '').trim();
+                    if (cellStr && (cellStr.includes('Karnataka') || cellStr.includes('Tumkur') || cellStr.includes('TUM') || cellStr.includes('VTC') || cellStr.includes('Post') || cellStr.includes('Dist') || cellStr.includes('Tq') || cellStr.length > 15)) {
+                        addrVal = cellStr.replace(/\s+/g, ' ');
+                        break;
+                    }
+                }
+
+                // Qualification & Occupation: Columns 11..14
+                for (const colIdx of [11, 12, 13, 14]) {
+                    const cellStr = String(row[colIdx] || '').trim();
+                    if (!cellStr || cellStr === '-' || cellStr.includes('Photo')) continue;
+                    if (!qualVal && cellStr.length < 25) {
+                        qualVal = cellStr;
+                    } else if (!occVal && cellStr !== qualVal) {
+                        occVal = cellStr;
+                    }
+                }
+
+                // Skip invalid rows
                 if (!nameVal || nameVal.toLowerCase().includes('name of the elector') || nameVal.toLowerCase().includes('sino')) {
                     continue;
                 }
 
-                // Lookup Polling Station details from masterPollingMap
-                const pollingInfo = masterPollingMap[currentPartNo] || {
-                    polling_station_name: currentPartNo ? `Polling Station for Part ${currentPartNo}` : null,
-                    polling_address: currentPartNo ? `Tumkur District, Karnataka` : null
+                // Lookup Polling Station details from masterPollingMap or FALLBACK_POLLING_MAP
+                const pollingInfo = masterPollingMap[currentPartNo] || FALLBACK_POLLING_MAP[currentPartNo] || {
+                    station: currentPartNo ? `Polling Station for Part ${currentPartNo}` : null,
+                    address: currentPartNo ? `Tumkur District, Karnataka` : null
                 };
 
                 seenEpics.add(epicVal);
@@ -225,8 +261,8 @@ for (const file of files) {
                     sex: sexVal || null,
                     serial_number: snoVal || null,
                     part_number: currentPartNo || null,
-                    polling_station_name: pollingInfo.polling_station_name,
-                    polling_address: pollingInfo.polling_address,
+                    polling_station_name: pollingInfo.polling_station_name || pollingInfo.station || null,
+                    polling_address: pollingInfo.polling_address || pollingInfo.address || null,
                     photo_url: null
                 });
                 fileRecordCount++;

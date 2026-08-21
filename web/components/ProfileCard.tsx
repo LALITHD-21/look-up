@@ -126,9 +126,9 @@ export default function ProfileCard({ elector }: ProfileCardProps) {
                 {elector.name}
               </h1>
               {elector.relative_name && (
-                <p className="text-sm sm:text-base text-slate-600 mt-1 flex items-center justify-center sm:justify-start gap-2">
-                  <Users className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="font-semibold text-slate-700">{elector.relative_name}</span>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1 flex items-center justify-center sm:justify-start gap-1.5 font-semibold">
+                  <Users className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                  <span>Father / Husband: <strong className="text-slate-900">{elector.relative_name}</strong></span>
                 </p>
               )}
             </div>

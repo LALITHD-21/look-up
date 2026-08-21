@@ -162,11 +162,39 @@ export async function POST(req: NextRequest) {
                             }
                         }
 
+                        // Name: Column 1
                         let nameVal = row[1] ? String(row[1]).trim().replace(/\s+/g, ' ') : '';
-                        let relVal = row[5] ? String(row[5]).trim().replace(/\s+/g, ' ') : '';
-                        let addrVal = row[8] ? String(row[8]).trim().replace(/\s+/g, ' ') : '';
-                        let qualVal = row[12] ? String(row[12]).trim() : '';
-                        let occVal = row[13] ? String(row[13]).trim() : '';
+
+                        // Relative Name: Column 4 or 5
+                        let relVal = '';
+                        if (row[4] && !/\d/.test(String(row[4])) && String(row[4]).length > 2) {
+                            relVal = String(row[4]).trim().replace(/\s+/g, ' ');
+                        } else if (row[5]) {
+                            relVal = String(row[5]).trim().replace(/\s+/g, ' ');
+                        }
+
+                        // Address: Column 7, 8, 9, or 6
+                        let addrVal = '';
+                        for (const colIdx of [7, 8, 9, 6]) {
+                            const cellStr = String(row[colIdx] || '').trim();
+                            if (cellStr && (cellStr.includes('Karnataka') || cellStr.includes('Tumkur') || cellStr.includes('TUM') || cellStr.includes('VTC') || cellStr.includes('Post') || cellStr.includes('Dist') || cellStr.includes('Tq') || cellStr.length > 15)) {
+                                addrVal = cellStr.replace(/\s+/g, ' ');
+                                break;
+                            }
+                        }
+
+                        // Qualification & Occupation: Columns 11..14
+                        let qualVal = '';
+                        let occVal = '';
+                        for (const colIdx of [11, 12, 13, 14]) {
+                            const cellStr = String(row[colIdx] || '').trim();
+                            if (!cellStr || cellStr === '-' || cellStr.includes('Photo')) continue;
+                            if (!qualVal && cellStr.length < 25) {
+                                qualVal = cellStr;
+                            } else if (!occVal && cellStr !== qualVal) {
+                                occVal = cellStr;
+                            }
+                        }
 
                         if (nameVal && !nameVal.toLowerCase().includes('name of the elector') && !nameVal.toLowerCase().includes('sino')) {
                             rawRows.push({

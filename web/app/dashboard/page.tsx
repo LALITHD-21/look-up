@@ -19,7 +19,7 @@ import {
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
-import { getElectorByEpic } from '@/lib/electorService';
+import { getElectorByEpic, prefetchElectorByEpic } from '@/lib/electorService';
 import { saveSearchHistoryItem } from '@/lib/searchHistory';
 import { Elector } from '@/lib/types';
 import { formatEpicForDisplay } from '@/lib/utils';
@@ -36,6 +36,11 @@ export default function DashboardPage() {
   const [historyTrigger, setHistoryTrigger] = useState<number>(0);
 
   const sampleEpics = ['TYA5121967', 'TYA4984829', 'TYA5455795', 'TYA0633792'];
+
+  React.useEffect(() => {
+    // Pre-warm in-memory cache for sample EPICs on landing page mount
+    sampleEpics.forEach((epic) => prefetchElectorByEpic(epic));
+  }, []);
 
   const handleInstantSearch = async (epic: string) => {
     setActiveEpic(epic);
@@ -211,6 +216,7 @@ export default function DashboardPage() {
                 {sampleEpics.map((epic) => (
                   <button
                     key={epic}
+                    onMouseEnter={() => prefetchElectorByEpic(epic)}
                     onClick={() => handleInstantSearch(epic)}
                     className="epic-mono font-bold text-slate-700 bg-white hover:bg-indigo-50 hover:text-indigo-700 px-2.5 py-1 rounded-xl border border-slate-200/80 shadow-xs transition active:scale-95 flex items-center gap-1"
                   >

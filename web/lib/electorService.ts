@@ -23,6 +23,16 @@ export function isEpicCached(epic: string): boolean {
 }
 
 /**
+ * Prefetch an elector record in the background to guarantee 0ms instant search response.
+ */
+export function prefetchElectorByEpic(rawEpic: string) {
+  const epic = normalizeEpic(rawEpic);
+  if (epic && isValidEpic(epic) && !electorCache.has(epic)) {
+    getElectorByEpic(epic).catch(() => {});
+  }
+}
+
+/**
  * Get an elector by EPIC card number with in-memory caching and server API lookup.
  * Returns { elector, error, fromCache, durationMs }
  */

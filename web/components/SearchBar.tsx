@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { normalizeEpic, isValidEpic } from '@/lib/utils';
+import { prefetchElectorByEpic } from '@/lib/electorService';
 import { Search, AlertCircle, Loader2, X, CheckCircle2, Sparkles } from 'lucide-react';
 
 interface SearchBarProps {
@@ -74,9 +75,12 @@ export default function SearchBar({
 
     if (error) setError(null);
 
-    // Auto-search when 10 valid chars reached
-    if (trimmed.length === 10 && isValidEpic(trimmed) && trimmed !== lastSearchedRef.current) {
-      executeSearch(trimmed);
+    // Prefetch and auto-search when 10 valid chars reached
+    if (trimmed.length === 10 && isValidEpic(trimmed)) {
+      prefetchElectorByEpic(trimmed);
+      if (trimmed !== lastSearchedRef.current) {
+        executeSearch(trimmed);
+      }
     }
   };
 

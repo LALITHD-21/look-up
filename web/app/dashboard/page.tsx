@@ -210,22 +210,6 @@ export default function DashboardPage() {
                 isLoading={isSearching}
               />
 
-              {/* Sample Demo Chips */}
-              <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs">
-                <span className="text-slate-400 font-extrabold text-[11px] uppercase tracking-wider">Try Demo EPICs:</span>
-                {sampleEpics.map((epic) => (
-                  <button
-                    key={epic}
-                    onMouseEnter={() => prefetchElectorByEpic(epic)}
-                    onClick={() => handleInstantSearch(epic)}
-                    className="epic-mono font-bold text-slate-700 bg-white hover:bg-indigo-50 hover:text-indigo-700 px-2.5 py-1 rounded-xl border border-slate-200/80 shadow-xs transition active:scale-95 flex items-center gap-1"
-                  >
-                    <span>{epic}</span>
-                    <ArrowRight className="w-3 h-3 text-slate-400" />
-                  </button>
-                ))}
-              </div>
-
               {/* Recent Search History */}
               <RecentSearches
                 onSelectEpic={handleInstantSearch}

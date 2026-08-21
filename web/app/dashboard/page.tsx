@@ -16,7 +16,6 @@ import {
   RefreshCw,
   Upload,
   Search,
-  ArrowRight,
   AlertCircle
 } from 'lucide-react';
 import { getElectorByEpic, prefetchElectorByEpic } from '@/lib/electorService';
@@ -34,13 +33,6 @@ export default function DashboardPage() {
   const [fromCache, setFromCache] = useState<boolean>(false);
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [historyTrigger, setHistoryTrigger] = useState<number>(0);
-
-  const sampleEpics = ['TYA5121967', 'TYA4984829', 'TYA5455795', 'TYA0633792'];
-
-  React.useEffect(() => {
-    // Pre-warm in-memory cache for sample EPICs on landing page mount
-    sampleEpics.forEach((epic) => prefetchElectorByEpic(epic));
-  }, []);
 
   const handleInstantSearch = async (epic: string) => {
     setActiveEpic(epic);
@@ -92,50 +84,64 @@ export default function DashboardPage() {
         }}
       />
 
-      <div className="w-full max-w-4xl space-y-6 sm:space-y-8 py-2 sm:py-4">
-        {/* Render Result Screen when user has searched */}
-        {hasSearched ? (
-          <div className="space-y-6 animate-fadeIn">
-            {/* Top Bar showing lookup metrics & Reset Button */}
-            <div className="flex items-center justify-between bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-              <button
-                onClick={handleClear}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition active:scale-95"
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>Search Another EPIC</span>
-              </button>
-
-              {lookupDuration !== null && (
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200/60">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>
-                    Latency: <strong className="text-indigo-600 epic-mono">{fromCache ? '0ms (cached)' : `${lookupDuration}ms`}</strong>
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Searching Loader */}
-            {isSearching && (
-              <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3 shadow-soft-xl animate-scaleIn">
-                <div className="relative inline-flex">
-                  <div className="absolute inset-0 rounded-full bg-indigo-100 animate-ping opacity-30" />
-                  <Loader2 className="w-8 h-8 text-indigo-600 animate-spin relative" />
-                </div>
-                <p className="text-sm font-semibold text-slate-700">
-                  Searching voter database for <span className="epic-mono font-bold text-indigo-600">{formatEpicForDisplay(activeEpic)}</span>
-                </p>
+      <div className="w-full max-w-4xl space-y-8 py-2 sm:py-4">
+        {/* Active Search Result View Header (Compact) */}
+        {hasSearched && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-soft-sm">
+              <div className="w-full sm:w-auto flex-1">
+                <SearchBar
+                  initialValue={activeEpic}
+                  autoFocus={false}
+                  onSearch={handleInstantSearch}
+                  onClear={handleClear}
+                  isLoading={isSearching}
+                  size="compact"
+                />
               </div>
-            )}
 
-            {/* Profile Result Display */}
-            {!isSearching && elector && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsUploadOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 hover:from-indigo-700 hover:to-violet-800 shadow-md transition active:scale-95 flex-shrink-0"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Upload Dataset</span>
+                </button>
+
+                <button
+                  onClick={handleClear}
+                  className="px-4 py-2 rounded-2xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition active:scale-95 flex-shrink-0"
+                >
+                  New Search
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading Spinner during search */}
+        {isSearching && (
+          <div className="bg-white p-10 rounded-3xl border border-slate-200/80 text-center space-y-4 shadow-soft-xl max-w-md mx-auto animate-scaleIn">
+            <div className="relative inline-flex">
+              <div className="absolute inset-0 rounded-full bg-indigo-100 animate-ping opacity-40" />
+              <Loader2 className="w-10 h-10 text-indigo-600 animate-spin relative" />
+            </div>
+            <div>
+              <p className="text-base font-extrabold text-slate-900">Scanning Database</p>
+              <p className="text-xs text-slate-500 font-medium mt-1">
+                Searching profile for <span className="epic-mono font-bold text-indigo-600">{formatEpicForDisplay(activeEpic)}</span>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Display Live Results */}
+        {!isSearching && hasSearched && (
+          <div className="animate-fadeInUp">
+            {elector ? (
               <ProfileDisplay elector={elector} showBackToDashboard={false} />
-            )}
-
-            {/* Error or Empty Result */}
-            {!isSearching && !elector && (
+            ) : (
               searchError ? (
                 <div className="max-w-md mx-auto bg-white p-8 rounded-3xl border border-rose-200/80 text-center space-y-4 shadow-soft-xl animate-scaleIn">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 mx-auto">
@@ -155,8 +161,10 @@ export default function DashboardPage() {
               )
             )}
           </div>
-        ) : (
-          /* Landing Hero & Search Form View */
+        )}
+
+        {/* Landing Hero & Search Form View */}
+        {!hasSearched && (
           <div className="space-y-6 sm:space-y-8 animate-fadeIn">
             {/* Hero Banner Section */}
             <div className="flex flex-col items-center justify-center text-center space-y-4">
@@ -169,22 +177,6 @@ export default function DashboardPage() {
                   priority
                   className="object-contain drop-shadow-md"
                 />
-              </div>
-
-              {/* Status Badges */}
-              <div className="inline-flex items-center justify-center gap-2 flex-wrap px-1">
-                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100/80 shadow-xs">
-                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Secure Real-Time Lookup</span>
-                </div>
-
-                <button
-                  onClick={() => setIsUploadOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-extrabold text-white bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 hover:from-indigo-700 hover:to-violet-800 shadow-md shadow-indigo-500/20 hover:shadow-lg transition-all duration-200 active:scale-95"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Upload Dataset</span>
-                </button>
               </div>
 
               {/* Main Headline */}
@@ -201,7 +193,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Search Input Box */}
-            <div className="space-y-4">
+            <div className="space-y-5">
               <SearchBar
                 initialValue={activeEpic}
                 autoFocus={true}
@@ -209,6 +201,23 @@ export default function DashboardPage() {
                 onClear={handleClear}
                 isLoading={isSearching}
               />
+
+              {/* Action Badges - Positioned directly below the Search Bar and made bigger */}
+              <div className="flex items-center justify-center gap-3 flex-wrap pt-2">
+                <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-extrabold text-indigo-700 bg-indigo-50/90 border border-indigo-200/90 shadow-sm transition hover:bg-indigo-100/80">
+                  <ShieldCheck className="w-4.5 h-4.5 text-indigo-600 flex-shrink-0" />
+                  <span>Secure Real-Time Lookup</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsUploadOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-extrabold text-white bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 hover:from-indigo-700 hover:to-violet-800 shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/35 transition-all duration-200 active:scale-95"
+                >
+                  <Upload className="w-4.5 h-4.5 flex-shrink-0" />
+                  <span>Upload Dataset</span>
+                </button>
+              </div>
 
               {/* Recent Search History */}
               <RecentSearches

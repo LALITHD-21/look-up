@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server';
-import electorsData from '@/data/electors.json';
+import { createClient } from '@/lib/supabase/server';
 import { Elector } from '@/lib/types';
-
-// Fast Map index for ultra-instant O(1) EPIC lookups across all 13,600 electors
-const electorsMap = new Map<string, Elector>();
-
-(electorsData as Elector[]).forEach((e) => {
-  if (e && e.epic_number) {
-    const cleanKey = e.epic_number.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    electorsMap.set(cleanKey, e);
-  }
-});
 
 export async function GET(
   request: Request,
@@ -23,20 +13,26 @@ export async function GET(
     return NextResponse.json({ error: 'EPIC number is required' }, { status: 400 });
   }
 
-  // 1. Direct O(1) Map lookup
-  const found = electorsMap.get(epic);
-  if (found) {
-    return NextResponse.json(found);
-  }
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('electors')
+      .select('*')
+      .eq('epic_number', epic)
+      .maybeSingle();
 
-  // 2. Secondary fallback match using Array.from
-  const entries = Array.from(electorsMap.entries());
-  for (let i = 0; i < entries.length; i++) {
-    const [key, record] = entries[i];
-    if (key.includes(epic) || epic.includes(key)) {
-      return NextResponse.json(record);
+    if (error) {
+      console.error('Supabase query error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
-  }
 
-  return NextResponse.json(null, { status: 404 });
+    if (!data) {
+      return NextResponse.json(null, { status: 404 });
+    }
+
+    return NextResponse.json(data as Elector);
+  } catch (err: any) {
+    console.error('API route exception:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

@@ -5,17 +5,8 @@ import ProfileDisplay from '@/components/ProfileDisplay';
 import EmptyState from '@/components/EmptyState';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import DashboardLayout from '../../dashboard/layout';
-import electorsData from '@/data/electors.json';
+import { createClient } from '@/lib/supabase/server';
 import { Elector } from '@/lib/types';
-
-// Fast Map index for server components
-const electorsMap = new Map<string, Elector>();
-(electorsData as Elector[]).forEach((e) => {
-  if (e && e.epic_number) {
-    const cleanKey = e.epic_number.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    electorsMap.set(cleanKey, e);
-  }
-});
 
 interface ProfilePageProps {
   params: {
@@ -77,8 +68,22 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     );
   }
 
-  // 2. Query 13,600 Electors Dataset
-  const elector = electorsMap.get(epic) || null;
+  // 2. Query Supabase electors database table
+  let elector: Elector | null = null;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('electors')
+      .select('*')
+      .eq('epic_number', epic)
+      .maybeSingle();
+
+    if (data) {
+      elector = data as Elector;
+    }
+  } catch (error) {
+    console.error('Failed to fetch elector profile from database:', error);
+  }
 
   // 3. Handle Not Found (Empty State)
   if (!elector) {

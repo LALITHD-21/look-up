@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
     };
 
-    const sessionString = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+    const sessionString = btoa(JSON.stringify(sessionData));
 
     const response = NextResponse.json({
       success: true,

@@ -9,13 +9,13 @@ import ProfileCard from './ProfileCard';
 import ProfileTable from './ProfileTable';
 import SearchBar from './SearchBar';
 import EmptyState from './EmptyState';
-import { ArrowLeft, Copy, Check, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Loader2, Sparkles, Printer } from 'lucide-react';
 import { getElectorByEpic, primeElectorCache } from '@/lib/electorService';
 import { formatEpicForDisplay } from '@/lib/utils';
+import { saveSearchHistoryItem } from '@/lib/searchHistory';
 
 interface ProfileDisplayProps {
   elector: Elector;
-  onSearchNew?: (epic: string) => void;
   showBackToDashboard?: boolean;
 }
 
@@ -40,7 +40,7 @@ export default function ProfileDisplay({
     }
   }, [initialElector]);
 
-  // Real-time fast in-place lookup for subsequent searches
+  // Real-time fast in-place lookup for quick search
   const handleFastSearch = async (epic: string) => {
     setIsSearching(true);
     setSearchError(null);
@@ -52,20 +52,22 @@ export default function ProfileDisplay({
     if (error) {
       setSearchError(error);
       setCurrentElector(null);
-    } else {
+      saveSearchHistoryItem(epic);
+    } else if (elector) {
       setCurrentElector(elector);
-      // Synchronize browser URL smoothly without full server reload
+      saveSearchHistoryItem(epic, elector.name);
+      // Synchronize browser URL smoothly
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, '', `/profile/${encodeURIComponent(epic)}`);
       }
     }
   };
 
-  // Copy full voter profile summary to clipboard
   const handleCopyDetails = () => {
     if (!currentElector) return;
 
     const summary = [
+      `--- ELECTOR DETAILS SLIP ---`,
       `EPIC Number: ${formatEpicForDisplay(currentElector.epic_number)}`,
       `Name: ${currentElector.name}`,
       currentElector.relative_name ? `Relative: ${currentElector.relative_name}` : null,
@@ -88,22 +90,22 @@ export default function ProfileDisplay({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fadeIn">
-      {/* Top action bar: back link & instant search input */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-2 no-print">
+    <div className="w-full max-w-4xl mx-auto space-y-5 animate-fadeIn">
+      {/* Action Bar Header */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-1 no-print">
         {showBackToDashboard ? (
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-indigo-600 transition self-start"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200/80 shadow-xs hover:bg-slate-50 hover:text-indigo-600 transition active:scale-95 self-start"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
+            <span>Back to Search</span>
           </Link>
         ) : (
           <div />
         )}
 
-        {/* Quick Instant Realtime Search Input */}
+        {/* Quick Instant Search Input */}
         <div className="w-full sm:w-80">
           <SearchBar
             initialValue={currentEpic}
@@ -117,64 +119,47 @@ export default function ProfileDisplay({
         </div>
       </div>
 
-      {/* Loading state during in-place search */}
+      {/* Loading state */}
       {isSearching && (
-        <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center space-y-3 shadow-sm">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
-          <p className="text-sm font-medium text-gray-600">Retrieving elector record...</p>
+        <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3 shadow-soft-xl animate-scaleIn">
+          <div className="relative inline-flex">
+            <div className="absolute inset-0 rounded-full bg-indigo-100 animate-ping opacity-30" />
+            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin relative" />
+          </div>
+          <p className="text-sm font-semibold text-slate-700">Retrieving elector profile...</p>
         </div>
       )}
 
-      {/* Main Content when not actively searching */}
+      {/* Main Content */}
       {!isSearching && (
         <>
-          {/* Found Elector View */}
           {currentElector ? (
-            <div className="space-y-6">
-              {/* Control Header with Profile summary & View Toggle */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-xl border border-gray-200 shadow-sm no-print">
+            <div className="space-y-5">
+              {/* Profile Bar Control Ribbon */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs no-print">
                 <div className="flex items-center gap-3">
                   <div>
-                    <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-400 block">
-                      Current Profile
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
+                      Active Elector Profile
                     </span>
                     <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                      <span className="font-bold text-gray-900 text-sm sm:text-base">
+                      <span className="font-extrabold text-slate-900 text-base sm:text-lg">
                         {currentElector.name}
                       </span>
-                      <span className="text-xs font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-100 font-semibold">
+                      <span className="text-xs font-mono bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-lg border border-indigo-100 font-bold">
                         {formatEpicForDisplay(currentElector.epic_number)}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                  {/* Copy Details Button */}
-                  <button
-                    onClick={handleCopyDetails}
-                    type="button"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm active:scale-95"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-700 font-semibold">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-gray-500" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Card / Table Toggle */}
+                <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
+                  {/* View Mode Toggle */}
                   <ViewToggle view={view} onChange={setView} />
                 </div>
               </div>
 
-              {/* Main Display: Card View or Table View */}
+              {/* View Output */}
               <div className="pt-1">
                 {view === 'card' ? (
                   <ProfileCard elector={currentElector} />
@@ -184,7 +169,6 @@ export default function ProfileDisplay({
               </div>
             </div>
           ) : (
-            /* Not Found / Empty State */
             <EmptyState epic={currentEpic} />
           )}
         </>

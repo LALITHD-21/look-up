@@ -12,35 +12,35 @@ export default function ViewToggle({ view, onChange }: ViewToggleProps) {
   return (
     <div
       role="group"
-      aria-label="View switch"
-      className="inline-flex p-1 bg-gray-100/80 rounded-xl border border-gray-200/60 shadow-inner-soft"
+      aria-label="View switch mode"
+      className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/80 shadow-xs"
     >
       <button
         type="button"
         onClick={() => onChange('card')}
         aria-pressed={view === 'card'}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 ${
+        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 ${
           view === 'card'
-            ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+            ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/60'
+            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
         }`}
       >
-        <LayoutGrid className="w-4 h-4" />
-        <span>Card</span>
+        <LayoutGrid className="w-3.5 h-3.5" />
+        <span>Card View</span>
       </button>
 
       <button
         type="button"
         onClick={() => onChange('table')}
         aria-pressed={view === 'table'}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 ${
+        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 ${
           view === 'table'
-            ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+            ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/60'
+            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
         }`}
       >
-        <TableProperties className="w-4 h-4" />
-        <span>Table</span>
+        <TableProperties className="w-3.5 h-3.5" />
+        <span>Table Slip</span>
       </button>
     </div>
   );

@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { normalizeEpic, isValidEpic } from '@/lib/utils';
-import { Search, AlertCircle, Loader2, X, CheckCircle2 } from 'lucide-react';
+import { Search, AlertCircle, Loader2, X, CheckCircle2, Sparkles } from 'lucide-react';
 
 interface SearchBarProps {
   initialValue?: string;
@@ -22,7 +22,7 @@ export default function SearchBar({
   onSearch,
   onClear,
   isLoading: externalLoading = false,
-  placeholder = 'Enter EPIC Number (e.g. TYA0633792)',
+  placeholder = 'Enter 10-digit EPIC (e.g. TYA0633792)',
   size = 'large',
   showCharCounter = true,
 }: SearchBarProps) {
@@ -30,6 +30,7 @@ export default function SearchBar({
   const [query, setQuery] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
   const [internalLoading, setInternalLoading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastSearchedRef = useRef<string>('');
 
@@ -46,7 +47,7 @@ export default function SearchBar({
     const normalized = normalizeEpic(rawInput);
 
     if (!normalized) {
-      setError('Please enter an EPIC number to search.');
+      setError('Please enter an EPIC number.');
       return;
     }
 
@@ -68,25 +69,19 @@ export default function SearchBar({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     const normalized = normalizeEpic(raw);
-    
-    // Limit to 10 characters maximum
     const trimmed = normalized.slice(0, 10);
     setQuery(trimmed);
 
-    if (error) {
-      setError(null);
-    }
+    if (error) setError(null);
 
-    // Auto-search trigger: as soon as exactly 10 valid characters are reached
+    // Auto-search when 10 valid chars reached
     if (trimmed.length === 10 && isValidEpic(trimmed) && trimmed !== lastSearchedRef.current) {
       executeSearch(trimmed);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Escape') {
-      handleClear();
-    }
+    if (e.key === 'Escape') handleClear();
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -98,9 +93,7 @@ export default function SearchBar({
     setQuery('');
     setError(null);
     lastSearchedRef.current = '';
-    if (onClear) {
-      onClear();
-    }
+    if (onClear) onClear();
     inputRef.current?.focus();
   };
 
@@ -111,10 +104,21 @@ export default function SearchBar({
   return (
     <div className={`w-full ${isCompact ? 'max-w-md' : 'max-w-xl'} mx-auto`}>
       <form onSubmit={handleSubmit} className="relative space-y-2" noValidate>
-        <div className="relative flex items-center">
+        {/* Glow halo when input is focused */}
+        <div
+          className={`absolute -inset-1 rounded-2xl bg-gradient-to-r ${
+            isValid
+              ? 'from-emerald-500/30 via-teal-500/20 to-emerald-500/30'
+              : 'from-indigo-500/30 via-violet-500/20 to-purple-500/30'
+          } blur-md transition-all duration-300 ${
+            isFocused ? 'opacity-100 scale-[1.01]' : 'opacity-0 scale-100'
+          }`}
+        />
+
+        <div className="relative flex items-center bg-white rounded-2xl border transition-all duration-200 shadow-sm hover:shadow-md">
           {/* Search Icon */}
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-            <Search className={isCompact ? 'w-4 h-4' : 'w-4 sm:w-5 h-4 sm:h-5'} />
+          <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-slate-400">
+            <Search className={isCompact ? 'w-4 h-4' : 'w-5 h-5 text-indigo-600'} />
           </div>
 
           {/* Main Search Input */}
@@ -125,33 +129,35 @@ export default function SearchBar({
             value={query}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             autoFocus={autoFocus}
             disabled={isLoading}
             maxLength={10}
             aria-label="EPIC Number search"
             placeholder={placeholder}
-            className={`w-full font-mono tracking-wider bg-white border-2 text-gray-900 placeholder-gray-400 placeholder:font-sans focus:outline-none transition ${
+            className={`w-full epic-mono tracking-widest bg-transparent font-bold text-slate-900 placeholder:font-sans placeholder:tracking-normal placeholder:font-medium placeholder:text-slate-400 focus:outline-none transition ${
               isCompact
-                ? 'pl-9 pr-20 py-2 text-xs sm:text-sm rounded-lg shadow-sm'
-                : 'pl-10 sm:pl-11 pr-24 sm:pr-28 py-3 sm:py-3.5 text-sm sm:text-base md:text-lg rounded-xl shadow-sm'
+                ? 'pl-9 pr-24 py-2.5 text-xs sm:text-sm rounded-xl'
+                : 'pl-11 sm:pl-12 pr-28 sm:pr-32 py-3.5 sm:py-4 text-sm sm:text-base md:text-lg rounded-2xl'
             } ${
               isValid
-                ? 'border-emerald-500 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100'
-                : 'border-gray-200 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100'
-            } disabled:bg-gray-50`}
+                ? 'border-emerald-500/80 focus:border-emerald-600 ring-2 ring-emerald-500/20'
+                : 'border-slate-200 focus:border-indigo-600 ring-2 ring-indigo-500/10'
+            } disabled:opacity-60 disabled:cursor-not-allowed`}
           />
 
           {/* Right Action Elements */}
-          <div className="absolute inset-y-0 right-0 pr-1.5 sm:pr-2 flex items-center gap-1 sm:gap-1.5">
-            {/* Real-time Character Counter / Validity Badge */}
+          <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-1.5">
+            {/* Real-time Validity Badge */}
             {showCharCounter && query.length > 0 && (
               <span
-                className={`hidden md:inline-flex items-center gap-1 text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full transition ${
+                className={`hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg transition-all ${
                   isValid
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-xs'
                     : isComplete
-                    ? 'bg-red-50 text-red-600 border border-red-200'
-                    : 'bg-gray-100 text-gray-600'
+                    ? 'bg-rose-50 text-rose-600 border border-rose-200/80'
+                    : 'bg-slate-100 text-slate-600'
                 }`}
               >
                 {isValid ? (
@@ -172,44 +178,47 @@ export default function SearchBar({
                 id="clear-search-button"
                 onClick={handleClear}
                 aria-label="Clear search input"
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition active:scale-90"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition active:scale-90"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
 
-            {/* Search / Status Button */}
+            {/* Search Submit Button */}
             <button
               type="submit"
               id="submit-search-button"
               disabled={isLoading || !query}
-              className={`inline-flex items-center justify-center font-semibold rounded-lg shadow-sm focus:outline-none transition ${
+              className={`inline-flex items-center justify-center font-bold rounded-xl shadow-md transition-all duration-200 active:scale-95 ${
                 isCompact
-                  ? 'px-2.5 sm:px-3 py-1.5 text-xs'
-                  : 'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm'
+                  ? 'px-3 py-1.5 text-xs'
+                  : 'px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm'
               } ${
                 isValid
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-2 focus:ring-emerald-500'
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-2 focus:ring-indigo-500'
-              } disabled:opacity-50 disabled:cursor-not-allowed active:scale-95`}
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-500/20'
+                  : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-indigo-500/20'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isLoading ? (
                 <Loader2 className={`${isCompact ? 'w-3.5 h-3.5' : 'w-4 h-4'} animate-spin`} />
               ) : (
-                'Search'
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Search</span>
+                </div>
               )}
             </button>
           </div>
         </div>
 
-        {/* Inline Error Message */}
+        {/* Error Alert Box */}
         {error && (
           <div
             role="alert"
-            className="flex items-center gap-2 px-3 py-2 text-xs md:text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg animate-fadeIn"
+            className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs md:text-sm text-rose-700 bg-rose-50/90 border border-rose-200/80 rounded-xl animate-fadeIn shadow-sm"
           >
-            <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500" />
-            <span>{error}</span>
+            <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-500" />
+            <span className="font-semibold">{error}</span>
           </div>
         )}
       </form>

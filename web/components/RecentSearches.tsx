@@ -29,38 +29,38 @@ export default function RecentSearches({ onSelectEpic, refreshTrigger = 0 }: Rec
   return (
     <div className="w-full max-w-xl mx-auto space-y-2.5 pt-2 animate-fadeIn">
       <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-400">
-          <Clock className="w-3.5 h-3.5 text-indigo-500" />
+        <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">
+          <Clock className="w-3.5 h-3.5 text-indigo-600" />
           <span>Recent Searches</span>
         </div>
 
         <button
           type="button"
           onClick={handleClearAll}
-          className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-red-600 transition"
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-rose-600 transition"
         >
           <Trash2 className="w-3 h-3" />
-          <span>Clear History</span>
+          <span>Clear</span>
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {history.map((item) => (
           <button
             key={item.epic}
             type="button"
             onClick={() => onSelectEpic(item.epic)}
-            className="group inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-white hover:bg-indigo-50/80 border border-gray-200/80 hover:border-indigo-200/80 shadow-sm text-[11px] sm:text-xs font-medium transition-all duration-200 active:scale-95"
+            className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-indigo-50/80 border border-slate-200/80 hover:border-indigo-200 shadow-xs text-xs font-semibold transition-all duration-200 active:scale-95"
           >
-            <span className="epic-mono font-bold text-gray-900 group-hover:text-indigo-700">
+            <span className="epic-mono font-extrabold text-slate-900 group-hover:text-indigo-700">
               {formatEpicForDisplay(item.epic)}
             </span>
             {item.name && (
-              <span className="text-gray-500 font-normal truncate max-w-[90px] sm:max-w-[120px]">
+              <span className="text-slate-500 font-medium truncate max-w-[120px]">
                 • {item.name}
               </span>
             )}
-            <ArrowUpRight className="w-3 h-3 text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            <ArrowUpRight className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </button>
         ))}
       </div>

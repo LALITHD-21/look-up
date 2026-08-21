@@ -1,19 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { LogOut, Loader2 } from 'lucide-react';
 
 export default function LogoutButton() {
-  const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      // Hard navigation to /login clears client state and Next.js router cache
       window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
@@ -26,14 +22,14 @@ export default function LogoutButton() {
       onClick={handleLogout}
       disabled={isLoggingOut}
       aria-label="Log out of application"
-      className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-semibold text-gray-600 hover:text-red-600 bg-transparent hover:bg-red-50 rounded-xl border border-transparent hover:border-red-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 active:scale-95"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-slate-200/80 hover:border-rose-200 rounded-xl shadow-xs transition-all duration-200 focus:outline-none disabled:opacity-50 active:scale-95"
     >
       {isLoggingOut ? (
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
       ) : (
-        <LogOut className="w-4 h-4" />
+        <LogOut className="w-3.5 h-3.5" />
       )}
-      <span>{isLoggingOut ? 'Signing out...' : 'Sign Out'}</span>
+      <span>{isLoggingOut ? 'Signing Out...' : 'Sign Out'}</span>
     </button>
   );
 }

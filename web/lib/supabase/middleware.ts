@@ -17,7 +17,8 @@ export async function updateSession(request: NextRequest) {
 
     if (sessionCookie) {
         try {
-            const decoded = JSON.parse(Buffer.from(sessionCookie, 'base64').toString('utf8'));
+            const jsonStr = atob(sessionCookie);
+            const decoded = JSON.parse(jsonStr);
             if (decoded && decoded.expiresAt && decoded.expiresAt > Date.now()) {
                 isAuthenticated = true;
             }

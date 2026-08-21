@@ -1,5 +1,4 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "npm install --prefix web && npm run build --prefix web",
-  "installCommand": "npm install --prefix web"
+  "buildCommand": "cd web && npm install && npm run build",
+  "installCommand": "cd web && npm install"
 }

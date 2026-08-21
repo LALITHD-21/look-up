@@ -232,39 +232,6 @@ export default function DashboardPage() {
                 refreshTrigger={historyTrigger}
               />
             </div>
-
-            {/* Feature Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 stagger-children">
-              <div className="card-hover group p-6 rounded-3xl bg-white border border-slate-200/60 shadow-soft-xl space-y-3">
-                <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 group-hover:scale-110 transition-transform duration-200">
-                  <Zap className="w-5.5 h-5.5" />
-                </div>
-                <h3 className="text-base font-extrabold text-slate-900">Instant Auto-Scan</h3>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Queries are indexed with sub-10ms response times and in-memory caching.
-                </p>
-              </div>
-
-              <div className="card-hover group p-6 rounded-3xl bg-white border border-slate-200/60 shadow-soft-xl space-y-3">
-                <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 group-hover:scale-110 transition-transform duration-200">
-                  <Database className="w-5.5 h-5.5" />
-                </div>
-                <h3 className="text-base font-extrabold text-slate-900">Dual Cards & Slips</h3>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Switch between card view and printable table slips with one click.
-                </p>
-              </div>
-
-              <div className="card-hover group p-6 rounded-3xl bg-white border border-slate-200/60 shadow-soft-xl space-y-3">
-                <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 group-hover:scale-110 transition-transform duration-200">
-                  <ShieldCheck className="w-5.5 h-5.5" />
-                </div>
-                <h3 className="text-base font-extrabold text-slate-900">RLS Protected</h3>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  PostgreSQL Row Level Security ensures strict authorization for queries.
-                </p>
-              </div>
-            </div>
           </div>
         )}
       </div>

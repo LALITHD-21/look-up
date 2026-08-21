@@ -82,9 +82,13 @@ export async function getElectorByEpic(rawEpic: string): Promise<{
       };
     }
 
+    // Try to parse server error payload for exact cause
+    const errorBody = await res.json().catch(() => null);
+    const serverMessage = errorBody?.error || 'Error retrieving elector profile.';
+
     return {
       elector: null,
-      error: 'Error retrieving elector profile.',
+      error: serverMessage,
       fromCache: false,
       durationMs: Math.round(performance.now() - startTime),
     };

@@ -5,7 +5,7 @@ import ProfileDisplay from '@/components/ProfileDisplay';
 import EmptyState from '@/components/EmptyState';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import DashboardLayout from '../../dashboard/layout';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { Elector } from '@/lib/types';
 
 interface ProfilePageProps {
@@ -71,14 +71,16 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   // 2. Query Supabase electors database table
   let elector: Elector | null = null;
   try {
-    const supabase = createClient();
-    const { data } = await supabase
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
       .from('electors')
       .select('*')
       .eq('epic_number', epic)
       .maybeSingle();
 
-    if (data) {
+    if (error) {
+      console.error('Supabase query error:', error);
+    } else if (data) {
       elector = data as Elector;
     }
   } catch (error) {

@@ -4,19 +4,21 @@ import { createClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
+  let hasUser = false;
+
   try {
     const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    hasUser = !!user;
+  } catch {
+    hasUser = false;
+  }
 
-    if (user) {
-      redirect('/dashboard');
-    } else {
-      redirect('/login');
-    }
-  } catch (error) {
-    // If any issue reading session, redirect to login
+  if (hasUser) {
+    redirect('/dashboard');
+  } else {
     redirect('/login');
   }
 }

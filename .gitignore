@@ -9,8 +9,11 @@
 etl/.env
 web/.env.local
 
-# --- Raw data (NEVER commit PII) ---
+# --- Raw data ---
 data/
+excle-formate/
+pdf-formate/
+pdf-ocr made/
 
 # --- ETL output ---
 etl/output/
@@ -31,6 +34,12 @@ out/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# --- Temp / Scratch ---
+etl/scratch_*
+etl/*.txt
+etl/page81_*
+web/*.js
 
 # --- IDE ---
 .vscode/

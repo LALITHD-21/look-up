@@ -20,35 +20,63 @@ load_dotenv()
 # Schema columns to insert (order matters — must match VALUES in the SQL)
 SCHEMA_COLUMNS = [
     'serial_number', 'epic_number', 'name', 'relative_name',
-    'address', 'qualification', 'occupation', 'age', 'sex', 'photo_url'
+    'address', 'qualification', 'occupation', 'age', 'sex',
+    'part_number', 'polling_station_name', 'polling_address', 'photo_url'
 ]
 
 UPSERT_SQL = """
     INSERT INTO electors
         (serial_number, epic_number, name, relative_name, address,
-         qualification, occupation, age, sex, photo_url)
+         qualification, occupation, age, sex, part_number,
+         polling_station_name, polling_address, photo_url)
     VALUES %s
     ON CONFLICT (epic_number) DO UPDATE SET
-        serial_number = EXCLUDED.serial_number,
-        name = EXCLUDED.name,
-        relative_name = EXCLUDED.relative_name,
-        address = EXCLUDED.address,
-        qualification = EXCLUDED.qualification,
-        occupation = EXCLUDED.occupation,
-        age = EXCLUDED.age,
-        sex = EXCLUDED.sex,
-        photo_url = EXCLUDED.photo_url,
-        updated_at = NOW()
+        serial_number        = EXCLUDED.serial_number,
+        name                 = EXCLUDED.name,
+        relative_name        = EXCLUDED.relative_name,
+        address              = EXCLUDED.address,
+        qualification        = EXCLUDED.qualification,
+        occupation           = EXCLUDED.occupation,
+        age                  = EXCLUDED.age,
+        sex                  = EXCLUDED.sex,
+        part_number          = EXCLUDED.part_number,
+        polling_station_name  = EXCLUDED.polling_station_name,
+        polling_address      = EXCLUDED.polling_address,
+        photo_url            = EXCLUDED.photo_url,
+        updated_at           = NOW()
+"""
+
+SINGLE_ROW_UPSERT_SQL = """
+    INSERT INTO electors
+        (serial_number, epic_number, name, relative_name, address,
+         qualification, occupation, age, sex, part_number,
+         polling_station_name, polling_address, photo_url)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (epic_number) DO UPDATE SET
+        serial_number        = EXCLUDED.serial_number,
+        name                 = EXCLUDED.name,
+        relative_name        = EXCLUDED.relative_name,
+        address              = EXCLUDED.address,
+        qualification        = EXCLUDED.qualification,
+        occupation           = EXCLUDED.occupation,
+        age                  = EXCLUDED.age,
+        sex                  = EXCLUDED.sex,
+        part_number          = EXCLUDED.part_number,
+        polling_station_name  = EXCLUDED.polling_station_name,
+        polling_address      = EXCLUDED.polling_address,
+        photo_url            = EXCLUDED.photo_url,
+        updated_at           = NOW()
 """
 
 
-def ingest_to_supabase(df: pd.DataFrame, method: str = 'copy') -> dict:
+def ingest_to_supabase(df: pd.DataFrame, method: str = 'copy', purge_first: bool = False) -> dict:
     """
     Bulk-insert the cleaned DataFrame into the Supabase `electors` table.
 
     Args:
         df: Cleaned DataFrame ready for ingestion.
         method: 'copy' (psycopg2 upsert — fast) or 'rest' (Supabase API — slower).
+        purge_first: If True, executes TRUNCATE TABLE electors before insertion.
 
     Returns:
         dict with rows_inserted, errors, duration_seconds.
@@ -57,7 +85,7 @@ def ingest_to_supabase(df: pd.DataFrame, method: str = 'copy') -> dict:
         return {'rows_inserted': 0, 'errors': ['DataFrame is empty'], 'duration_seconds': 0}
 
     if method == 'copy':
-        res = _upsert_via_psycopg2(df)
+        res = _upsert_via_psycopg2(df, purge_first=purge_first)
         if res.get('errors') and res.get('rows_inserted', 0) == 0:
             logger.warning("  Direct PostgreSQL connection failed. Falling back to Supabase REST API...")
             return _upsert_via_rest(df)
@@ -103,7 +131,7 @@ def _prepare_records(df: pd.DataFrame) -> list:
     return records
 
 
-def _upsert_via_psycopg2(df: pd.DataFrame) -> dict:
+def _upsert_via_psycopg2(df: pd.DataFrame, purge_first: bool = False) -> dict:
     """
     Upsert using psycopg2's execute_values for maximum speed.
     Uses INSERT ... ON CONFLICT DO UPDATE (idempotent).
@@ -129,6 +157,12 @@ def _upsert_via_psycopg2(df: pd.DataFrame) -> dict:
         conn = psycopg2.connect(db_url)
         cur = conn.cursor()
 
+        if purge_first:
+            logger.info("  PURGING existing 'electors' table records...")
+            cur.execute("TRUNCATE TABLE electors RESTART IDENTITY")
+            conn.commit()
+            logger.info("  ✓ Table electors successfully truncated.")
+
         # Prepare records
         records = _prepare_records(df)
         total = len(records)
@@ -143,14 +177,21 @@ def _upsert_via_psycopg2(df: pd.DataFrame) -> dict:
             try:
                 execute_values(cur, UPSERT_SQL, batch, page_size=batch_size)
                 inserted += len(batch)
+                conn.commit()
             except Exception as e:
-                logger.error(f"  Error in batch {i // batch_size}: {e}")
-                result['errors'].append(f"Batch {i // batch_size}: {str(e)}")
+                logger.warning(f"  Batch {i // batch_size} failed: {e}. Running row-by-row fallback...")
                 conn.rollback()
-                # Try to continue with next batch
-                continue
+                batch_inserted = 0
+                for row_tuple in batch:
+                    try:
+                        cur.execute(SINGLE_ROW_UPSERT_SQL, row_tuple)
+                        conn.commit()
+                        batch_inserted += 1
+                    except Exception as row_err:
+                        logger.error(f"    Row insert error for EPIC {row_tuple[1]}: {row_err}")
+                        conn.rollback()
+                inserted += batch_inserted
 
-        conn.commit()
         result['rows_inserted'] = inserted
 
         # Verify row count in database

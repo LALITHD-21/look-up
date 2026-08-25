@@ -23,9 +23,11 @@ from extract import extract_all
 from clean import clean_dataframe
 from validate import validate_records, generate_report_text
 from ingest import ingest_to_supabase, verify_ingestion
+from polling import load_polling_parts_mapping
 
 # Load environment variables from .env
 load_dotenv()
+
 
 
 def setup_logging(verbose: bool = False):
@@ -156,8 +158,9 @@ Examples:
         logger.info(f"Extracted {len(df)} raw rows from {len(source_files)} files")
 
         # ─── Step 1b: Clean ───────────────────────────────────────────────────
-        logger.info("Cleaning data...")
-        df = clean_dataframe(df)
+        logger.info("Cleaning data and attaching polling station details...")
+        polling_map = load_polling_parts_mapping('../poling addres')
+        df = clean_dataframe(df, polling_map=polling_map)
 
         if df.empty:
             logger.error("All rows dropped during cleaning. Check source data.")

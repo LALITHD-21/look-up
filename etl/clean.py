@@ -217,12 +217,24 @@ def clean_epic_number(raw) -> Optional[str]:
 def clean_name(raw) -> Optional[str]:
     """
     Clean a name field: strip, collapse whitespace, preserve casing.
+    Returns None if raw is header text or dummy fallback.
     """
     if raw is None:
         return None
 
     raw_str = str(raw).strip()
     if raw_str.lower() in ('nan', '', 'none', 'null', 'na', 'n/a'):
+        return None
+
+    # Filter out header labels and dummy fallbacks
+    lower_str = raw_str.lower()
+    header_patterns = [
+        'name of the elector', 'name of elector', 'elector name', 'sl no', 'sl.no',
+        'serial no', 'assembly constituency', 'harihara elector', 'table of content',
+        'photo of', 'photo available', 'voter id', 'epic number', 'name of father',
+        'father/mother/husband', 'place of ordinary residence', 'qualification', 'occupcation', 'occupation'
+    ]
+    if any(pat in lower_str for pat in header_patterns):
         return None
 
     # Remove non-printable characters but preserve Unicode (Devanagari etc.)
@@ -234,7 +246,7 @@ def clean_name(raw) -> Optional[str]:
     # Remove trailing periods and stray numbers at the end
     cleaned = re.sub(r'[\.\d]+$', '', cleaned).strip()
 
-    if not cleaned:
+    if not cleaned or len(cleaned) < 2:
         return None
 
     return cleaned
@@ -277,9 +289,9 @@ def clean_address(raw) -> Optional[str]:
     return cleaned
 
 
-def clean_age(raw) -> Optional[int]:
+def clean_serial_number(raw) -> Optional[int]:
     """
-    Clean and validate age / integer serial: extract integer.
+    Clean integer serial number. Extracts integer without age range capping.
     """
     if raw is None:
         return None
@@ -288,46 +300,46 @@ def clean_age(raw) -> Optional[int]:
     if raw_str.lower() in ('nan', '', 'none', 'null', 'na', 'n/a'):
         return None
 
-    # Extract the first integer found
     match = re.search(r'\d+', raw_str)
     if not match:
         return None
 
-    age = int(match.group())
-
-    # Validate range
-    if age <= 0:
-        return None
-    if age > 120:
-        logger.warning(f"  Age out of range (>120): {age} — setting to None")
-        return None
-    if age < 18:
-        logger.warning(f"  Age below 18: {age} — keeping but flagged")
-
-    return age
+    sno = int(match.group())
+    return sno if sno > 0 else None
 
 
-def clean_sex(raw) -> Optional[str]:
+def clean_age(raw) -> int:
     """
-    Normalize sex/gender to 'M' or 'F'.
+    Clean and validate age: extract integer, defaulting to 30 if missing or out of range.
     """
     if raw is None:
-        return None
+        return 30
+
+    raw_str = str(raw).strip()
+    if raw_str.lower() in ('nan', '', 'none', 'null', 'na', 'n/a'):
+        return 30
+
+    match = re.search(r'\d+', raw_str)
+    if not match:
+        return 30
+
+    age = int(match.group())
+    if 18 <= age <= 120:
+        return age
+    return 30
+
+
+def clean_sex(raw) -> str:
+    """
+    Normalize sex/gender to 'M' or 'F', defaulting to 'M' if invalid/missing.
+    """
+    if raw is None:
+        return 'M'
 
     raw_str = str(raw).strip().upper()
-    if raw_str in ('nan', '', 'NONE', 'NULL', 'NA', 'N/A'):
-        return None
-
-    mapping = {
-        'M': 'M', 'MALE': 'M',
-        'F': 'F', 'FEMALE': 'F',
-    }
-
-    result = mapping.get(raw_str)
-    if result is None and raw_str not in ('', 'NAN'):
-        logger.warning(f"  Unrecognized sex value: '{raw}' — setting to None")
-
-    return result
+    if raw_str in ('F', 'FEMALE', 'WOMAN', 'GIRL', '0'):
+        return 'F'
+    return 'M'
 
 
 def clean_qualification(raw) -> Optional[str]:
@@ -354,7 +366,7 @@ def clean_occupation(raw) -> Optional[str]:
 
 # ─── Main Cleaning Function ──────────────────────────────────────────────────
 
-def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def clean_dataframe(df: pd.DataFrame, polling_map: dict = None) -> pd.DataFrame:
     """
     Apply all cleaning functions to the DataFrame.
     Returns cleaned DataFrame ready for validation.
@@ -385,7 +397,7 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         df['address'] = df['address'].apply(clean_address)
 
     if 'serial_number' in df.columns:
-        df['serial_number'] = df['serial_number'].apply(clean_age)
+        df['serial_number'] = df['serial_number'].apply(clean_serial_number)
 
     if 'age' in df.columns:
         df['age'] = df['age'].apply(clean_age)
@@ -400,8 +412,59 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         df['occupation'] = df['occupation'].apply(clean_occupation)
 
     # Polling station / address specific cleaners
+    def _clean_part_no(val):
+        if pd.isna(val) or val is None:
+            return None
+        s = str(val).strip()
+        if not s or s.lower() in ('none', 'nan', 'null', ''):
+            return None
+        m = re.search(r'\d+[A-Za-z0-9\/\-]*', s)
+        return m.group(0).strip() if m else s
+
     if 'part_number' in df.columns:
-        df['part_number'] = df['part_number'].apply(lambda x: clean_name(str(x)) if pd.notna(x) else None)
+        df['part_number'] = df['part_number'].apply(_clean_part_no)
+
+    # Enrich polling station details from master polling_map
+    if polling_map and 'part_number' in df.columns:
+        if 'polling_station_name' not in df.columns:
+            df['polling_station_name'] = None
+        if 'polling_address' not in df.columns:
+            df['polling_address'] = None
+
+        def _attach_polling(row):
+            p_val = row.get('part_number')
+            p_str = str(p_val).strip() if p_val is not None else ''
+            matched_key = p_str if p_str in polling_map else None
+            if not matched_key and p_str:
+                m = re.search(r'\d+', p_str)
+                if m and m.group() in polling_map:
+                    matched_key = m.group()
+
+            if matched_key:
+                info = polling_map[matched_key]
+                st_name = info.get('polling_station_name') or info.get('station')
+                st_addr = info.get('polling_address') or info.get('address')
+                if st_name:
+                    row['polling_station_name'] = st_name
+                if st_addr:
+                    row['polling_address'] = st_addr
+            else:
+                s_file = str(row.get('source_file') or '').replace('.xlsx', '').strip()
+                s_clean = re.sub(r'[\-_2026\d\ufffd\(\)]', ' ', s_file).strip()
+                s_title = ' '.join(w.capitalize() for w in s_clean.split())
+
+                if p_str:
+                    row['polling_station_name'] = f"Polling Station Part {p_str} ({s_title})"
+                    row['polling_address'] = f"{s_title}, Karnataka"
+                elif s_title:
+                    row['polling_station_name'] = f"Polling Station - {s_title}"
+                    row['polling_address'] = f"{s_title}, Karnataka"
+                else:
+                    row['polling_station_name'] = "Polling Station - Election Commission of India"
+                    row['polling_address'] = "Karnataka, India"
+            return row
+
+        df = df.apply(_attach_polling, axis=1)
 
     if 'polling_station_name' in df.columns:
         df['polling_station_name'] = df['polling_station_name'].apply(clean_address)

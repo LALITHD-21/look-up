@@ -20,12 +20,12 @@ export async function GET() {
         .from('electors')
         .select('id', { count: 'exact' })
         .limit(1);
-      return NextResponse.json({ count: fallbackCount ?? 13600 });
+      return NextResponse.json({ count: fallbackCount ?? 0 });
     }
 
-    return NextResponse.json({ count: count ?? 13600 });
+    return NextResponse.json({ count: count ?? 0 });
   } catch (err: any) {
     console.error('Stats endpoint error:', err);
-    return NextResponse.json({ count: 13600 });
+    return NextResponse.json({ count: 0 });
   }
 }

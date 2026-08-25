@@ -128,9 +128,28 @@ def extract_from_excel(file_path: str) -> pd.DataFrame:
                 df = df.dropna(how='all')
                 df = df[~df.apply(lambda row: all(str(v).strip() == '' for v in row), axis=1)]
 
-                if df.empty:
-                    logger.warning(f"  Sheet '{sheet_name}' has no data rows after cleanup, skipping.")
-                    continue
+                # Track Part No from row text if part_number is not in columns
+                has_part_col = any('part' in str(c).lower() for c in df.columns)
+                if not has_part_col:
+                    part_series = []
+                    current_part = None
+                    part_regex = re.compile(r'Part\s*N?\s*o?\s*[\:\.\·\-\s]\s*(\d+[A-Za-z0-9\/\-]*)', re.IGNORECASE)
+
+                    for r_idx in range(min(20, len(df_raw_clean))):
+                        r_str = ' '.join(str(v) for v in df_raw_clean.iloc[r_idx].values if pd.notna(v))
+                        m = part_regex.search(r_str)
+                        if m:
+                            current_part = m.group(1).strip()
+                            break
+
+                    for _, row in df.iterrows():
+                        row_str = ' '.join(str(v) for v in row.values if pd.notna(v))
+                        m = part_regex.search(row_str)
+                        if m:
+                            current_part = m.group(1).strip()
+                        part_series.append(current_part)
+
+                    df['part_number'] = part_series
 
                 df['source_sheet'] = sheet_name
                 df['source_file'] = path.name

@@ -40,7 +40,11 @@ export async function GET(
       return NextResponse.json(null, { status: 404 });
     }
 
-    return NextResponse.json(data as Elector);
+    return NextResponse.json(data as Elector, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      },
+    });
   } catch (err: any) {
     console.error('API route exception:', err);
     return NextResponse.json(

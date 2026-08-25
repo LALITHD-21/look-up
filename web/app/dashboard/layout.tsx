@@ -46,24 +46,24 @@ export default function DashboardLayout({
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">{children}</main>
 
-      {/* Professional Executive Watermark Footer */}
-      <footer className="relative border-t border-slate-800/80 bg-slate-900 text-slate-300 py-6 overflow-hidden">
-        {/* Top Glowing Gradient Accent Bar */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-indigo-500 via-violet-400 to-purple-500 opacity-90" />
+      {/* Discreet Compact Watermark Footer */}
+      <footer className="relative border-t border-slate-800/80 bg-slate-900 text-slate-400 py-2 sm:py-2.5 text-[10px] sm:text-[11px] overflow-hidden">
+        {/* Top Accent Bar */}
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-indigo-500/50 via-violet-400/50 to-purple-500/50 opacity-75" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
-          {/* Left / Center Watermark Statement */}
-          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold tracking-wide text-slate-100 flex-wrap justify-center md:justify-start">
-            <span className="text-slate-400 font-normal">© 2026</span>
-            <span className="bg-gradient-to-r from-indigo-400 via-violet-300 to-purple-400 bg-clip-text text-transparent font-extrabold text-sm sm:text-base">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-1.5 text-center sm:text-left">
+          {/* Left Watermark Statement */}
+          <div className="flex items-center gap-1.5 font-medium tracking-tight text-slate-400 justify-center sm:justify-start">
+            <span>© 2026</span>
+            <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent font-bold">
               LALITH D &amp; MOHIT J GUJJAR
             </span>
-            <span className="text-slate-400 font-medium">• All Rights Reserved.</span>
+            <span className="opacity-60">• All Rights Reserved</span>
           </div>
 
           {/* Right Excellence Tagline */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700/80 text-[11px] font-semibold text-indigo-300 shadow-inner">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/60 border border-slate-700/50 text-[9px] sm:text-[10px] text-slate-400 mx-auto sm:mx-0">
+            <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
             <span>Designed &amp; Developed with Excellence</span>
           </div>
         </div>

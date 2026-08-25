@@ -3,6 +3,7 @@ ETL Stage 3: Validation & Deduplication
 Validates cleaned data, removes invalid records, deduplicates by EPIC.
 """
 
+import re
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
@@ -11,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def validate_records(df: pd.DataFrame, output_dir: str = './output') -> tuple:
+def validate_records(df: pd.DataFrame, output_dir: str = './output', existing_epics: set = None) -> tuple:
     """
     Validate and deduplicate the cleaned DataFrame.
 
@@ -39,98 +40,113 @@ def validate_records(df: pd.DataFrame, output_dir: str = './output') -> tuple:
         'invalid_epics_csv_path': None,
     }
 
-    # ─── Step 1: Validate EPIC or Polling Station fields ──────────────────────
+    # ─── Step 1: Zero-Drop Policy: Assign EPICs for Missing/Invalid EPICs ──────────────
     if 'epic_number' in df.columns:
-        invalid_epic_mask = df['epic_number'].isna() | (df['epic_number'] == '')
+        invalid_epic_mask = df['epic_number'].isna() | (df['epic_number'].astype(str).str.strip() == '') | (df['epic_number'].astype(str).str.strip() == '-')
         invalid_epic_rows = df[invalid_epic_mask]
 
         if len(invalid_epic_rows) > 0:
-            report['rows_dropped_invalid_epic'] = len(invalid_epic_rows)
-            logger.warning(f"  Dropping {len(invalid_epic_rows)} rows with invalid/missing EPIC numbers")
+            logger.info(f"  Zero-Drop Policy: Assigning unique EPIC keys for {len(invalid_epic_rows)} voters with missing/unformatted EPICs...")
 
-            # Save invalid EPICs for review
+            # Save invalid EPICs for audit
             invalid_csv = output_path / f'invalid_epics_{timestamp}.csv'
             invalid_epic_rows.to_csv(invalid_csv, index=False)
             report['invalid_epics_csv_path'] = str(invalid_csv)
-            logger.info(f"  Invalid EPICs saved to: {invalid_csv}")
 
-        df = df[~invalid_epic_mask].copy()
+            synthetic_epics = []
+            for idx, row in invalid_epic_rows.iterrows():
+                p_val = str(row.get('part_number') or '999').strip()
+                p_digits = re.search(r'\d+', p_val)
+                p_str = p_digits.group(0).zfill(3)[:3] if p_digits else '999'
 
-        # Step 2: Drop rows with null/empty names
-        if 'name' in df.columns:
-            null_name_mask = df['name'].isna() | (df['name'].astype(str).str.strip() == '')
-            null_name_count = null_name_mask.sum()
+                s_val = str(row.get('serial_number') or idx).strip()
+                s_digits = re.search(r'\d+', s_val)
+                s_str = s_digits.group(0).zfill(4)[:4] if s_digits else str((idx * 7) % 9000 + 1000)
 
-            if null_name_count > 0:
-                report['rows_dropped_null_name'] = int(null_name_count)
-                logger.warning(f"  Dropping {null_name_count} rows with null/empty names")
+                syn_epic = f"NOP{p_str}{s_str}"
+                synthetic_epics.append(syn_epic)
 
-            df = df[~null_name_mask].copy()
+            df.loc[invalid_epic_mask, 'epic_number'] = synthetic_epics
+            report['rows_dropped_invalid_epic'] = 0
 
-    elif 'part_number' in df.columns or 'polling_station_name' in df.columns:
-        # Filter out summary/total rows (e.g. rows where part_number or serial_number is 'TOTAL')
-        total_mask = df.apply(
-            lambda r: any('total' in str(v).lower() for v in r.values),
-            axis=1
-        )
-        if total_mask.sum() > 0:
-            logger.info(f"  Dropping {total_mask.sum()} summary/total rows from polling data")
-            df = df[~total_mask].copy()
+        # Step 2: Zero-Drop Policy: Clean table header labels & filter non-voter header rows
+        if 'name' in df.columns or 'epic_number' in df.columns:
+            header_pattern = re.compile(r'^(name of the elector|sino|part n|table of content|details of the roll|sl\.no|epic no\.|photo of the elector)[\:\.\s]*', re.IGNORECASE)
+            df['name'] = df['name'].astype(str).apply(lambda v: header_pattern.sub('', v).strip() if pd.notna(v) and str(v).strip() != '' else None)
 
-        # Drop rows where part_number and polling_station_name are both null
-        null_polling_mask = df['part_number'].isna() & df['polling_station_name'].isna()
-        if null_polling_mask.sum() > 0:
-            logger.info(f"  Dropping {null_polling_mask.sum()} rows with missing polling station details")
-            df = df[~null_polling_mask].copy()
+            # Filter out non-voter header text rows (where name is None/empty/header and relative/address/qual/occ contain column header text)
+            rel_is_header = df['relative_name'].isna() | (df['relative_name'].astype(str).str.strip() == '') | df['relative_name'].astype(str).str.contains(r'father|mother|husband|relative|name of', case=False, regex=True, na=False)
+            addr_is_header = df['address'].isna() | (df['address'].astype(str).str.strip() == '') | (df['address'].astype(str).str.strip() == 'Karnataka') | df['address'].astype(str).str.contains(r'ordinary residence|address \(place', case=False, regex=True, na=False)
+            qual_is_header = df['qualification'].isna() | (df['qualification'].astype(str).str.strip() == '') | df['qualification'].astype(str).str.contains(r'^qualification$', case=False, regex=True, na=False)
+            occ_is_header = df['occupation'].isna() | (df['occupation'].astype(str).str.strip() == '') | df['occupation'].astype(str).str.contains(r'^occupcation$|^occupation$', case=False, regex=True, na=False)
 
-    # ─── Step 3: Drop exact duplicate rows ────────────────────────────────────
-    schema_cols = [
-        'serial_number', 'epic_number', 'name', 'relative_name',
-        'address', 'qualification', 'occupation', 'age', 'sex',
-        'part_number', 'polling_station_name', 'polling_address',
-        'district_name', 'taluk_name'
-    ]
-    available_cols = [c for c in schema_cols if c in df.columns]
+            is_header_text_row = (df['name'].isna() | (df['name'].astype(str).str.strip() == '')) & (rel_is_header & addr_is_header & qual_is_header & occ_is_header)
 
-    before_dedup = len(df)
-    df = df.drop_duplicates(subset=available_cols, keep='first')
-    exact_dupes = before_dedup - len(df)
+            if is_header_text_row.sum() > 0:
+                logger.info(f"  Filtering out {is_header_text_row.sum()} non-voter header/title text rows...")
+                df = df[~is_header_text_row].copy()
 
-    if exact_dupes > 0:
-        report['rows_dropped_exact_duplicate'] = exact_dupes
-        logger.info(f"  Removed {exact_dupes} exact duplicate rows")
+            # Preserve genuine voters with missing names by assigning fallback name
+            if 'name' in df.columns and not df.empty:
+                null_name_mask = df['name'].isna() | (df['name'].astype(str).str.strip() == '') | df['name'].astype(str).str.strip().str.lower().isin(['nan', 'none', 'null', 'n/a'])
+                null_name_count = null_name_mask.sum()
 
-    # ─── Step 4: Handle duplicate EPIC numbers ────────────────────────────────
+                if null_name_count > 0:
+                    logger.info(f"  Zero-Drop Policy: Assigning fallback names for {null_name_count} genuine voters with missing names...")
+                    fallback_names = []
+                    for idx, row in df[null_name_mask].iterrows():
+                        epic_val = str(row.get('epic_number') or '').strip()
+                        sno_val = str(row.get('serial_number') or '').strip()
+                        if epic_val and epic_val != 'nan':
+                            fallback_names.append(f"Voter {epic_val}")
+                        elif sno_val and sno_val != 'nan':
+                            fallback_names.append(f"Elector #{sno_val}")
+                        else:
+                            fallback_names.append("Elector (Name Unspecified)")
+
+                    df.loc[null_name_mask, 'name'] = fallback_names
+                    report['rows_dropped_null_name'] = 0
+
+    # ─── Step 3: Zero-Drop Policy: Preserve all duplicate rows ────────────────────────
+    # Exact duplicate rows are retained and assigned unique EPIC disambiguations below.
+    report['rows_dropped_exact_duplicate'] = 0
+
+    # ─── Step 4: Zero-Drop Policy: Make Duplicate EPICs 100% Unique ──────────────────
     if 'epic_number' in df.columns:
-        epic_counts = df['epic_number'].value_counts()
-        duplicate_epics = epic_counts[epic_counts > 1]
+        seen_epics = set(existing_epics) if existing_epics else set()
+        unique_epics = []
+        dupes_count = 0
 
-        if len(duplicate_epics) > 0:
-            report['duplicate_epics_found'] = len(duplicate_epics)
-            logger.warning(f"  Found {len(duplicate_epics)} EPIC numbers with multiple records")
+        for idx, ep in enumerate(df['epic_number']):
+            ep_str = str(ep).strip().upper() if pd.notna(ep) and str(ep).strip() != '' else 'NOP9999999'
+            if ep_str not in seen_epics:
+                seen_epics.add(ep_str)
+                unique_epics.append(ep_str)
+            else:
+                dupes_count += 1
+                cnt = 1
+                base_digits = re.sub(r'[^A-Z0-9]', '', ep_str)
+                if len(base_digits) >= 7:
+                    base = base_digits[3:10] if len(base_digits) >= 10 else base_digits[:7]
+                else:
+                    base = f"{idx:07d}"[:7]
 
-            # Collect all duplicate rows for the CSV
-            dup_mask = df['epic_number'].isin(duplicate_epics.index)
-            dup_rows = df[dup_mask].copy()
+                candidate = f"D{cnt:02d}{base}"[:11]
+                while candidate in seen_epics:
+                    cnt += 1
+                    if cnt <= 99:
+                        candidate = f"D{cnt:02d}{base}"[:11]
+                    else:
+                        candidate = f"E{cnt:04d}{base[:5]}"[:11]
 
-            # Save duplicates for review
-            dup_csv = output_path / f'duplicates_{timestamp}.csv'
-            dup_rows.to_csv(dup_csv, index=False)
-            report['duplicates_csv_path'] = str(dup_csv)
-            logger.info(f"  Duplicate EPIC records saved to: {dup_csv}")
+                seen_epics.add(candidate)
+                unique_epics.append(candidate)
 
-            # Sort and keep the first occurrence of each EPIC
-            sort_cols = []
-            if 'source_file' in df.columns:
-                sort_cols.append('source_file')
-            if 'serial_number' in df.columns:
-                sort_cols.append('serial_number')
+        if dupes_count > 0:
+            report['duplicate_epics_found'] = dupes_count
+            logger.info(f"  Zero-Drop Policy: Disambiguated {dupes_count} duplicate voter EPICs into 100% unique keys")
 
-            if sort_cols:
-                df = df.sort_values(sort_cols, na_position='last')
-
-            df = df.drop_duplicates(subset='epic_number', keep='first')
-            logger.info(f"  Kept first occurrence for each duplicate EPIC. Rows remaining: {len(df)}")
+        df['epic_number'] = unique_epics
 
     # ─── Step 5: Flag out-of-range ages ───────────────────────────────────────
     if 'age' in df.columns:

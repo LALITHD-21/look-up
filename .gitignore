@@ -47,3 +47,6 @@ web/*.js
 *.swp
 *.swo
 *~
+
+.vercel
+.env*

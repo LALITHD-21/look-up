@@ -1,0 +1,13 @@
+.git
+node_modules
+.next
+etl/
+pdf/
+data/
+excle-formate/
+pdf-formate/
+pdf-ocr made/
+*.pdf
+*.xlsx
+*.csv
+*.py

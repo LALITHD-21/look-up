@@ -18,12 +18,7 @@ export async function middleware(request: NextRequest) {
 
     if (sessionCookie) {
       try {
-        let jsonStr = '';
-        if (typeof atob === 'function') {
-          jsonStr = atob(sessionCookie);
-        } else if (typeof Buffer !== 'undefined') {
-          jsonStr = Buffer.from(sessionCookie, 'base64').toString('utf-8');
-        }
+        const jsonStr = atob(sessionCookie);
         const decoded = JSON.parse(jsonStr);
         if (decoded && decoded.expiresAt && decoded.expiresAt > Date.now()) {
           isAuthenticated = true;

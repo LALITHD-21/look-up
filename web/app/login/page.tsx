@@ -170,15 +170,15 @@ function LoginForm() {
           </button>
         </form>
 
-        {/* Demo Quick Fill Buttons */}
+        {/* Quick Fill Buttons */}
         <div className="space-y-2.5 pt-3 border-t border-slate-100">
           <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block text-center">
-            Authorized Demo Accounts (Click to fill)
+            Authorized Accounts (Click to fill)
           </span>
           <div className="flex items-center justify-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={() => { setIdentifier('admin'); setPassword('AdminPassword123!'); setError(null); }}
+              onClick={() => { setIdentifier('admin'); setPassword('1234@portal'); setError(null); }}
               className="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 rounded-xl transition active:scale-95 flex items-center gap-1"
             >
               <Sparkles className="w-3 h-3 text-indigo-600" />
@@ -186,19 +186,11 @@ function LoginForm() {
             </button>
             <button
               type="button"
-              onClick={() => { setIdentifier('operator'); setPassword('OperatorPassword123!'); setError(null); }}
+              onClick={() => { setIdentifier('operator'); setPassword('1234@admin'); setError(null); }}
               className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 rounded-xl transition active:scale-95 flex items-center gap-1"
             >
               <Sparkles className="w-3 h-3 text-emerald-600" />
               <span>operator</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setIdentifier('supervisor'); setPassword('SupervisorPassword123!'); setError(null); }}
-              className="px-3 py-1.5 text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200/80 rounded-xl transition active:scale-95 flex items-center gap-1"
-            >
-              <Sparkles className="w-3 h-3 text-violet-600" />
-              <span>supervisor</span>
             </button>
           </div>
         </div>

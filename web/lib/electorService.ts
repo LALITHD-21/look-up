@@ -112,3 +112,49 @@ export async function getElectorByEpic(rawEpic: string): Promise<{
     };
   }
 }
+
+/**
+ * Permanently update an elector record in Supabase and refresh in-memory cache.
+ */
+export async function updateElectorRecord(
+  rawEpic: string,
+  updatedFields: Partial<Elector>
+): Promise<{ elector: Elector | null; error: string | null }> {
+  const epic = normalizeEpic(rawEpic);
+
+  if (!epic) {
+    return { elector: null, error: 'Invalid EPIC number' };
+  }
+
+  try {
+    const res = await fetch(`/api/elector/${encodeURIComponent(epic)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatedFields),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => null);
+      return {
+        elector: null,
+        error: errorBody?.error || 'Failed to update elector record.',
+      };
+    }
+
+    const updatedElector = (await res.json()) as Elector;
+    
+    // Update cache with updated record
+    primeElectorCache(epic, updatedElector);
+
+    return { elector: updatedElector, error: null };
+  } catch (err: any) {
+    console.error('Error updating elector:', err);
+    return {
+      elector: null,
+      error: err?.message || 'Network error updating elector record.',
+    };
+  }
+}
+

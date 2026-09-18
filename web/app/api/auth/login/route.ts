@@ -5,17 +5,12 @@ const AUTHORIZED_ACCOUNTS: Record<string, { email: string; role: string; passwor
   admin: {
     email: 'admin@electorportal.com',
     role: 'System Admin',
-    password: 'AdminPassword123!',
+    password: '1234@portal',
   },
   operator: {
     email: 'operator@electorportal.com',
     role: 'Data Operator',
-    password: 'OperatorPassword123!',
-  },
-  supervisor: {
-    email: 'supervisor@electorportal.com',
-    role: 'Electoral Supervisor',
-    password: 'SupervisorPassword123!',
+    password: '1234@admin',
   },
 };
 

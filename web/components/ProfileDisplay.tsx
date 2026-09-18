@@ -9,7 +9,8 @@ import ProfileCard from './ProfileCard';
 import ProfileTable from './ProfileTable';
 import SearchBar from './SearchBar';
 import EmptyState from './EmptyState';
-import { ArrowLeft, Copy, Check, Loader2, Sparkles, Printer } from 'lucide-react';
+import EditElectorModal from './EditElectorModal';
+import { ArrowLeft, Copy, Check, Loader2, Sparkles, Printer, Edit3 } from 'lucide-react';
 import { getElectorByEpic, primeElectorCache } from '@/lib/electorService';
 import { formatEpicForDisplay } from '@/lib/utils';
 import { saveSearchHistoryItem } from '@/lib/searchHistory';
@@ -30,6 +31,7 @@ export default function ProfileDisplay({
   const [copied, setCopied] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Prime cache with the initially loaded elector
   useEffect(() => {
@@ -91,6 +93,18 @@ export default function ProfileDisplay({
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-5 animate-fadeIn">
+      {/* Edit Elector Modal */}
+      {currentElector && (
+        <EditElectorModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          elector={currentElector}
+          onSaveSuccess={updated => {
+            setCurrentElector(updated);
+          }}
+        />
+      )}
+
       {/* Action Bar Header */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-1 no-print">
         {showBackToDashboard ? (
@@ -154,6 +168,16 @@ export default function ProfileDisplay({
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
+                  {/* Edit Record Action Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-sm transition active:scale-95"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit Record</span>
+                  </button>
+
                   {/* View Mode Toggle */}
                   <ViewToggle view={view} onChange={setView} />
                 </div>
@@ -162,9 +186,15 @@ export default function ProfileDisplay({
               {/* View Output */}
               <div className="pt-1">
                 {view === 'card' ? (
-                  <ProfileCard elector={currentElector} />
+                  <ProfileCard
+                    elector={currentElector}
+                    onEditRequest={() => setIsEditModalOpen(true)}
+                  />
                 ) : (
-                  <ProfileTable elector={currentElector} />
+                  <ProfileTable
+                    elector={currentElector}
+                    onEditRequest={() => setIsEditModalOpen(true)}
+                  />
                 )}
               </div>
             </div>

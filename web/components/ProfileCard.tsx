@@ -16,14 +16,16 @@ import {
   ShieldCheck,
   BadgeCheck,
   Calendar,
-  UserCheck
+  UserCheck,
+  Edit3
 } from 'lucide-react';
 
 interface ProfileCardProps {
   elector: Elector;
+  onEditRequest?: () => void;
 }
 
-export default function ProfileCard({ elector }: ProfileCardProps) {
+export default function ProfileCard({ elector, onEditRequest }: ProfileCardProps) {
   const [copied, setCopied] = useState(false);
   const formattedEpic = formatEpicForDisplay(elector.epic_number);
 
@@ -99,6 +101,18 @@ export default function ProfileCard({ elector }: ProfileCardProps) {
               </>
             )}
           </button>
+
+          {/* Edit Record Button */}
+          {onEditRequest && (
+            <button
+              onClick={onEditRequest}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition active:scale-95 shadow-xs"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Edit Record</span>
+            </button>
+          )}
         </div>
       </div>
 

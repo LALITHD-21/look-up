@@ -3,13 +3,14 @@
 import React from 'react';
 import { Elector } from '@/lib/types';
 import { formatEpicForDisplay } from '@/lib/utils';
-import { Printer, FileText } from 'lucide-react';
+import { Printer, FileText, Edit3 } from 'lucide-react';
 
 interface ProfileTableProps {
   elector: Elector;
+  onEditRequest?: () => void;
 }
 
-export default function ProfileTable({ elector }: ProfileTableProps) {
+export default function ProfileTable({ elector, onEditRequest }: ProfileTableProps) {
   const mainRows = [
     { label: 'EPIC Number', value: elector.epic_number, formatted: formatEpicForDisplay(elector.epic_number), isMono: true },
     { label: 'Serial Number', value: elector.serial_number?.toString() || '—' },
@@ -40,14 +41,26 @@ export default function ProfileTable({ elector }: ProfileTableProps) {
           <FileText className="w-4 h-4 text-indigo-600" />
           <span>Tabular Voter Record</span>
         </div>
-        <button
-          onClick={handlePrint}
-          type="button"
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200/80 rounded-xl shadow-xs hover:bg-slate-50 hover:shadow-md focus:ring-2 focus:ring-indigo-500/20 transition active:scale-95"
-        >
-          <Printer className="w-4 h-4 text-slate-500" />
-          <span>Print Table Slip</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onEditRequest && (
+            <button
+              onClick={onEditRequest}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/90 rounded-xl hover:bg-indigo-100 shadow-xs transition active:scale-95"
+            >
+              <Edit3 className="w-4 h-4 text-indigo-600" />
+              <span>Edit Record</span>
+            </button>
+          )}
+          <button
+            onClick={handlePrint}
+            type="button"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200/80 rounded-xl shadow-xs hover:bg-slate-50 hover:shadow-md focus:ring-2 focus:ring-indigo-500/20 transition active:scale-95"
+          >
+            <Printer className="w-4 h-4 text-slate-500" />
+            <span>Print Table Slip</span>
+          </button>
+        </div>
       </div>
 
       {/* Printable Data Table */}
